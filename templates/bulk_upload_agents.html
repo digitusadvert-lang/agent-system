@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block page_title %}Bulk Upload Agents{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Bulk Upload Agents</h2>
+    <p>Upload an Excel file to add multiple agents at once</p>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-upload me-2 text-primary"></i> Upload Excel File
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-4">
+                        <label class="form-label">Select Excel File</label>
+                        <input type="file" class="form-control" name="file" accept=".xlsx,.xls" required>
+                        <div class="form-text">Accepts .xlsx and .xls files</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-users me-2"></i> Upload & Create Agents
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2 text-warning"></i> Required Excel Format
+            </div>
+            <div class="card-body">
+                <p class="text-muted" style="font-size:13.5px">Your Excel file <strong>must</strong> have these column headers in row 1:</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Column Header</th>
+                                <th>Required?</th>
+                                <th>Example</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size:13px">
+                            <tr>
+                                <td><code>username</code></td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                                <td>ahmad123</td>
+                            </tr>
+                            <tr>
+                                <td><code>email</code></td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                                <td>ahmad@company.com</td>
+                            </tr>
+                            <tr>
+                                <td><code>password</code></td>
+                                <td><span class="badge bg-danger">Required</span></td>
+                                <td>Pass@1234</td>
+                            </tr>
+                            <tr>
+                                <td><code>full_name</code></td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                                <td>Ahmad Bin Ali</td>
+                            </tr>
+                            <tr>
+                                <td><code>phone</code></td>
+                                <td><span class="badge bg-secondary">Optional</span></td>
+                                <td>0123456789</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="alert alert-warning mt-3 mb-0" style="font-size:13px">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    Duplicate usernames or emails will be <strong>skipped</strong> automatically — existing agents are not overwritten.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('admin_agents') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-1"></i> Back to Agents
+    </a>
+</div>
+{% endblock %}

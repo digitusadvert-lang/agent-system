@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-user-friends me-2"></i> Agent Management</h2>
+    <p>Manage agents, passwords and download credits</p>
+</div>
+
+<!-- CREDIT MANAGEMENT PANEL -->
+<div class="card mb-4" style="border:1px solid rgba(99,102,241,0.2)">
+    <div class="card-header" style="background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.08));border-bottom:1px solid rgba(99,102,241,0.15)">
+        <i class="fas fa-coins me-2" style="color:#a78bfa"></i>
+        <span style="font-weight:700;color:#4338ca">Download Credit Management</span>
+        <span class="text-muted ms-2" style="font-size:12px">Credits are used when agents download search results</span>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+
+            <!-- Add to ALL agents -->
+            <div class="col-lg-5">
+                <form method="POST" action="{{ url_for('admin_add_credits') }}" class="d-flex align-items-end gap-2">
+                    <input type="hidden" name="credit_action" value="all">
+                    <div class="flex-grow-1">
+                        <label class="form-label fw-bold mb-1" style="font-size:13px">Add to ALL Agents</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-coins text-warning"></i></span>
+                            <input type="number" class="form-control" name="amount" min="1" max="9999"
+                                   placeholder="e.g. 10" required style="max-width:100px">
+                            <span class="input-group-text text-muted" style="font-size:12px">credits to all agents</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary"
+                            onclick="return confirm('Add credits to ALL agents?')"
+                            style="white-space:nowrap">
+                        <i class="fas fa-users me-1"></i> Add to All
+                    </button>
+                </form>
+            </div>
+
+            <div class="col-lg-1 text-center d-none d-lg-block" style="padding-bottom:8px">
+                <span class="text-muted" style="font-size:18px">|</span>
+            </div>
+
+            <!-- Add to specific agents -->
+            <div class="col-lg-6">
+                <form method="POST" action="{{ url_for('admin_add_credits') }}" class="d-flex align-items-end gap-2">
+                    <input type="hidden" name="credit_action" value="specific">
+                    <div>
+                        <label class="form-label fw-bold mb-1" style="font-size:13px">Add to Specific Agent(s)</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-coins text-warning"></i></span>
+                            <input type="number" class="form-control" name="amount" min="1" max="9999"
+                                   placeholder="Credits" required style="max-width:90px">
+                            <span class="input-group-text text-muted" style="font-size:12px">to agent ID(s)</span>
+                            <input type="text" class="form-control" name="agent_ids"
+                                   placeholder="e.g. 2, 5, 8" required style="max-width:140px">
+                        </div>
+                        <div class="form-text">Separate multiple IDs with comma or space</div>
+                    </div>
+                    <button type="submit" class="btn btn-success" style="white-space:nowrap;margin-bottom:20px">
+                        <i class="fas fa-user-plus me-1"></i> Add Credits
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- Credit cost reference -->
+        <div class="mt-3 p-3 rounded" style="background:#f8fafc;border:1px solid #e2e8f0">
+            <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px">
+                <i class="fas fa-info-circle me-1"></i> Download Credit Cost Reference
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                {% for label, cost in [('1–10 rows','1'),('11–50 rows','2'),('51–150 rows','3'),('151–300 rows','4'),('301–500 rows','5'),('501–750 rows','6'),('751–1000 rows','7'),('1001–1500 rows','8'),('1501–2000 rows','9'),('2000+ rows','10')] %}
+                <span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:11px;font-weight:600;padding:5px 10px">
+                    {{ label }} = {{ cost }} credit{{ 's' if cost != '1' else '' }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AGENTS TABLE -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-users me-2"></i> All Agents</span>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('bulk_upload_agents') }}" class="btn btn-sm btn-success">
+                <i class="fas fa-file-excel me-1"></i> Bulk Upload
+            </a>
+            <a href="{{ url_for('add_agent') }}" class="btn btn-sm btn-primary">
+                <i class="fas fa-plus me-1"></i> Add Agent
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table mb-0" id="agentsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Credits</th>
+                        <th>Status</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for agent in agents %}
+                    <tr>
+                        <td style="font-size:12px;color:#94a3b8">#{{ agent.id }}</td>
+                        <td style="font-weight:600">{{ agent.username }}</td>
+                        <td>{{ agent.full_name }}</td>
+                        <td style="font-size:13px">{{ agent.email }}</td>
+                        <td style="font-size:13px">{{ agent.phone }}</td>
+                        <td>
+                            <span class="badge {% if agent.credit_balance <= 0 %}bg-danger{% elif agent.credit_balance <= 5 %}bg-warning text-dark{% else %}bg-success{% endif %}"
+                                  style="font-size:12px;padding:5px 10px">
+                                <i class="fas fa-coins me-1"></i>{{ agent.credit_balance }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if agent.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-size:12px;color:#94a3b8">
+                            {{ agent.last_login.strftime('%d %b %Y %H:%M') if agent.last_login else 'Never' }}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('toggle_agent', agent_id=agent.id) }}"
+                               class="btn btn-sm {% if agent.is_active %}btn-warning{% else %}btn-success{% endif %}"
+                               onclick="return confirm('Are you sure?')">
+                                {% if agent.is_active %}
+                                    <i class="fas fa-ban"></i>
+                                {% else %}
+                                    <i class="fas fa-check"></i>
+                                {% endif %}
+                            </a>
+                            <button class="btn btn-sm btn-secondary change-pw-btn"
+                                    data-agent-id="{{ agent.id }}"
+                                    data-agent-name="{{ agent.full_name }}">
+                                <i class="fas fa-key"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary credit-btn"
+                                    data-agent-id="{{ agent.id }}"
+                                    data-agent-name="{{ agent.full_name }}"
+                                    data-agent-credits="{{ agent.credit_balance }}"
+                                    title="Add credits">
+                                <i class="fas fa-coins"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Change Password Modal -->
+<div class="modal fade" id="changePwModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-key me-2"></i> Change Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="changePwForm">
+                <div class="modal-body">
+                    <p class="text-muted mb-3">Changing password for: <strong id="agentNameLabel"></strong></p>
+                    <div class="mb-3">
+                        <label class="form-label">New Password</label>
+                        <input type="password" class="form-control" name="new_password"
+                               id="newPasswordInput" placeholder="Min 6 characters" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" class="form-control" name="confirm_password"
+                               id="confirmPasswordInput" placeholder="Repeat new password" required>
+                    </div>
+                    <div id="pwMatchError" class="text-danger d-none">Passwords do not match.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Add Credit Modal -->
+<div class="modal fade" id="creditModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-coins me-2 text-warning"></i> Add Credits</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_add_credits') }}">
+                <input type="hidden" name="credit_action" value="specific">
+                <input type="hidden" name="agent_ids" id="creditAgentId">
+                <div class="modal-body">
+                    <p class="text-muted mb-3" style="font-size:13px">
+                        Agent: <strong id="creditAgentName"></strong><br>
+                        Current balance: <strong id="creditAgentBalance"></strong> credits
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Credits to Add</label>
+                        <input type="number" class="form-control" name="amount"
+                               min="1" max="9999" placeholder="e.g. 10" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i> Add Credits
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function () {
+        $('#agentsTable').DataTable({ pageLength: 25, order: [[0, 'desc']] });
+
+        var changePwModal = new bootstrap.Modal(document.getElementById('changePwModal'));
+        var creditModal = new bootstrap.Modal(document.getElementById('creditModal'));
+
+        $(document).on('click', '.change-pw-btn', function () {
+            var agentId = $(this).data('agent-id');
+            var agentName = $(this).data('agent-name');
+            $('#agentNameLabel').text(agentName);
+            $('#changePwForm').attr('action', '/admin/agent/' + agentId + '/change-password');
+            $('#newPasswordInput').val('');
+            $('#confirmPasswordInput').val('');
+            $('#pwMatchError').addClass('d-none');
+            changePwModal.show();
+        });
+
+        $('#changePwForm').on('submit', function (e) {
+            if ($('#newPasswordInput').val() !== $('#confirmPasswordInput').val()) {
+                e.preventDefault();
+                $('#pwMatchError').removeClass('d-none');
+            }
+        });
+
+        $(document).on('click', '.credit-btn', function () {
+            $('#creditAgentId').val($(this).data('agent-id'));
+            $('#creditAgentName').text($(this).data('agent-name'));
+            $('#creditAgentBalance').text($(this).data('agent-credits'));
+            creditModal.show();
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block page_title %}Search Customer{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-start">
+    <div>
+        <h2>Search Customer</h2>
+        <p>Search by name, IC number or phone number</p>
+    </div>
+    <div class="text-end">
+        <div style="background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(139,92,246,0.1));border:1px solid rgba(99,102,241,0.25);border-radius:12px;padding:10px 18px">
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">Download Credits</div>
+            <div style="font-size:24px;font-weight:700;color:{% if current_user.credit_balance <= 0 %}#ef4444{% elif current_user.credit_balance <= 5 %}#f59e0b{% else %}#6366f1{% endif %}">
+                <i class="fas fa-coins me-1" style="font-size:16px"></i>{{ current_user.credit_balance }}
+            </div>
+            <div style="font-size:11px;color:#94a3b8">credits remaining</div>
+        </div>
+    </div>
+</div>
+<div>
+    <div>
+
+            {% if blocked %}
+            <div class="alert alert-{{ 'danger' if device_status == 'blocked' else 'warning' }} mb-4">
+                <i class="fas fa-{{ 'ban' if device_status == 'blocked' else 'clock' }} me-2"></i>
+                {% if device_status == 'blocked' %}
+                    <strong>Access Denied.</strong> This device has been blocked by admin. Please contact your administrator.
+                {% else %}
+                    <strong>Device Pending Approval.</strong> Your device has been registered and is awaiting admin approval. You cannot view customer data until approved.
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="fp" id="fp_input">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="search_type" class="form-label">Search By</label>
+                                <select class="form-select" id="search_type" name="search_type" required>
+                                    <option value="name"  {% if search_type == 'name'  %}selected{% endif %}>Name</option>
+                                    <option value="phone" {% if search_type == 'phone' %}selected{% endif %}>Phone Number</option>
+                                    <option value="ic"    {% if search_type == 'ic'    %}selected{% endif %}>IC Number</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="search_term" class="form-label">Search Term</label>
+                                <input type="text" class="form-control" id="search_term" name="search_term"
+                                       value="{{ search_term }}" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <button type="submit" class="btn btn-primary w-100">Search</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {% if results %}
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Search Results ({{ results|length }} found)</h5>
+                        {% if session.get('last_search_log_id') %}
+                        {% set cost = results|length %}
+                        {% set credit_cost = 1 if cost <= 10 else (2 if cost <= 50 else (3 if cost <= 150 else (4 if cost <= 300 else (5 if cost <= 500 else (6 if cost <= 750 else (7 if cost <= 1000 else (8 if cost <= 1500 else (9 if cost <= 2000 else 10)))))))) %}
+                        <div class="d-flex align-items-center gap-2">
+                            <span style="font-size:12px;color:#94a3b8">
+                                <i class="fas fa-coins me-1 text-warning"></i>Cost: <strong>{{ credit_cost }} credit{{ 's' if credit_cost > 1 else '' }}</strong>
+                                &nbsp;|&nbsp; Your balance: <strong style="color:{% if current_user.credit_balance < credit_cost %}#ef4444{% else %}#10b981{% endif %}">{{ current_user.credit_balance }}</strong>
+                            </span>
+                            {% if current_user.credit_balance >= credit_cost %}
+                            <a href="{{ url_for('download_results', search_log_id=session.get('last_search_log_id')) }}"
+                               class="btn btn-sm btn-success"
+                               onclick="return confirm('This will use {{ credit_cost }} credit(s). Continue?')">
+                                <i class="fas fa-download me-1"></i> Download Excel
+                            </a>
+                            {% else %}
+                            <button class="btn btn-sm btn-secondary" disabled title="Insufficient credits">
+                                <i class="fas fa-lock me-1"></i> Insufficient Credits
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="resultsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Contact Number</th>
+                                    <th>IC Number</th>
+                                    <th>Address</th>
+                                    <th>Email</th>
+                                    <th>Full Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for customer in results %}
+                                <tr>
+                                    <td>{{ customer.name or '—' }}</td>
+                                    <td>{{ customer.contact_number or '—' }}</td>
+                                    <td>{{ customer.ic_number or '—' }}</td>
+                                    <td>{{ customer.address[:50] if customer.address else '—' }}{% if customer.address and customer.address|length > 50 %}...{% endif %}</td>
+                                    <td>{{ customer.email or '—' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info view-detail-btn"
+                                                data-customer-id="{{ customer.id }}">
+                                            <i class="fas fa-eye"></i> View All
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Customer Detail Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user"></i> Customer Full Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="customerModalBody">
+                <div class="text-center"><div class="spinner-border"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Generate a stable browser fingerprint
+    function generateFingerprint() {
+        var components = [
+            navigator.userAgent,
+            navigator.language,
+            screen.width + 'x' + screen.height,
+            screen.colorDepth,
+            new Date().getTimezoneOffset(),
+            navigator.hardwareConcurrency || '',
+            navigator.platform
+        ];
+        var str = components.join('|');
+        // Simple hash
+        var hash = 0;
+        for (var i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0;
+        }
+        return Math.abs(hash).toString(16).padStart(8, '0') + '_' +
+               btoa(navigator.userAgent).replace(/[^a-zA-Z0-9]/g,'').substring(0, 16);
+    }
+
+    var fp = generateFingerprint();
+    document.getElementById('fp_input').value = fp;
+    document.cookie = 'fp=' + fp + '; path=/; SameSite=Strict';
+
+    $(document).ready(function () {
+        $('#resultsTable').DataTable({
+            pageLength: 25,
+            order: [[0, 'asc']]
+        });
+
+        // View full detail modal
+        $(document).on('click', '.view-detail-btn', function () {
+            var customerId = $(this).data('customer-id');
+            $('#customerModalBody').html('<div class="text-center"><div class="spinner-border"></div></div>');
+            new bootstrap.Modal(document.getElementById('customerModal')).show();
+
+            $.getJSON('/customer/' + customerId + '/detail', function (data) {
+                var html = '<table class="table table-bordered">';
+
+                var core = [
+                    ['Name', data.name],
+                    ['Contact Number', data.contact_number],
+                    ['IC Number', data.ic_number],
+                    ['Address', data.address],
+                    ['Email', data.email]
+                ];
+
+                core.forEach(function (row) {
+                    html += '<tr><th style="width:35%;background:#f8f9fa">' + row[0] + '</th><td>' + (row[1] || '—') + '</td></tr>';
+                });
+
+                if (data.additional && Object.keys(data.additional).length > 0) {
+                    html += '<tr><td colspan="2" class="table-secondary fw-bold">Additional Information</td></tr>';
+                    Object.entries(data.additional).forEach(function ([key, value]) {
+                        html += '<tr><th style="width:35%;background:#f8f9fa">' + key + '</th><td>' + (value || '—') + '</td></tr>';
+                    });
+                }
+
+                html += '</table>';
+                $('#customerModalBody').html(html);
+            });
+        });
+
+        // Log screenshot
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'PrintScreen') {
+                {% if session.get('last_search_log_id') %}
+                fetch("{{ url_for('log_screenshot', search_log_id=session.get('last_search_log_id')) }}", {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                {% endif %}
+            }
+        });
+    });
+</script>
+{% endblock %}

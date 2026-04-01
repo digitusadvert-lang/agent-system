@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-code-branch"></i> Merge Customer Data</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Data Merge Tool:</strong> This tool allows you to merge customer data from two different uploads.
+                        The system will automatically detect duplicates based on IC number or contact number.
+                        Newer data will be merged with existing records.
+                    </div>
+                    
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="old_upload_id" class="form-label">Select Base Data (Older)</label>
+                            <select class="form-select" id="old_upload_id" name="old_upload_id" required>
+                                <option value="">Select an upload...</option>
+                                {% for upload in uploads %}
+                                    <option value="{{ upload.id }}">{{ upload.filename }} - {{ upload.upload_date.strftime('%Y-%m-%d') }} ({{ upload.row_count }} records)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="new_upload_id" class="form-label">Select New Data (To Merge)</label>
+                            <select class="form-select" id="new_upload_id" name="new_upload_id" required>
+                                <option value="">Select an upload...</option>
+                                {% for upload in uploads %}
+                                    <option value="{{ upload.id }}">{{ upload.filename }} - {{ upload.upload_date.strftime('%Y-%m-%d') }} ({{ upload.row_count }} records)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Important:</strong> This operation will:
+                            <ul class="mb-0 mt-2">
+                                <li>Update existing customers with new information</li>
+                                <li>Add new customers that don't exist in the base data</li>
+                                <li>Preserve all existing data that is not overwritten</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <button type="submit" class="btn btn-custom" onclick="return confirm('Are you sure you want to merge these datasets? This action cannot be undone.')">
+                                <i class="fas fa-code-branch"></i> Merge Data
+                            </button>
+                            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                    
+                    <hr>
+                    
+                    <h6>Available Uploads:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Filename</th>
+                                    <th>Date</th>
+                                    <th>Records</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for upload in uploads %}
+                                <tr>
+                                    <td>{{ upload.id }}</td>
+                                    <td>{{ upload.filename }}</td>
+                                    <td>{{ upload.upload_date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ upload.row_count }}</td>
+                                    <td>
+                                        <span class="badge bg-success">{{ upload.status }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

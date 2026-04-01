@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-upload"></i> Upload Customer Data</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>File Requirements:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Excel file format (.xlsx or .xls)</li>
+                            <li>Required columns: Name, Contact Number, IC Number</li>
+                            <li>Optional columns: Address, Email, and any other custom fields</li>
+                            <li>Maximum file size: 50MB</li>
+                        </ul>
+                    </div>
+                    
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="file" class="form-label">Select Excel File</label>
+                            <input type="file" class="form-control" id="file" name="file" accept=".xlsx,.xls" required>
+                        </div>
+                        <div class="mb-3">
+                            <button type="submit" class="btn btn-custom">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload and Process
+                            </button>
+                            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                    
+                    <hr>
+                    
+                    <h6>Column Mapping Guide:</h6>
+                    <p>The system will automatically detect columns based on these keywords:</p>
+                    <ul>
+                        <li><strong>Name:</strong> name, full_name, customer_name, nama</li>
+                        <li><strong>Contact Number:</strong> contact, phone, mobile, tel, no_telefon</li>
+                        <li><strong>IC Number:</strong> ic, ic_number, id_number, no_ic, identification</li>
+                        <li><strong>Address:</strong> address, alamat, addr</li>
+                        <li><strong>Email:</strong> email, e-mail</li>
+                    </ul>
+                    <p class="text-muted small">Any unmapped columns will be stored as additional data.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

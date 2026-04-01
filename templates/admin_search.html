@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block page_title %}Search Customer Data{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Search Customer Data</h2>
+    <p>Search by name, IC number or phone number</p>
+</div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="POST">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label class="form-label">Search By</label>
+                        <select class="form-select" name="search_type" required>
+                            <option value="name"  {% if search_type == 'name'  %}selected{% endif %}>Name</option>
+                            <option value="phone" {% if search_type == 'phone' %}selected{% endif %}>Phone Number</option>
+                            <option value="ic"    {% if search_type == 'ic'    %}selected{% endif %}>IC Number</option>
+                        </select>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label">Search Term</label>
+                        <input type="text" class="form-control" name="search_term"
+                               value="{{ search_term }}" placeholder="Type to search..." required>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if results %}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Results — {{ results|length }} record(s) found</h5>
+            <span class="badge bg-success fs-6">Preview OK ✓</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover" id="adminResultsTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Contact Number</th>
+                            <th>IC Number</th>
+                            <th>Address</th>
+                            <th>Email</th>
+                            <th>Full Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for customer in results %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ customer.name or '—' }}</td>
+                            <td>{{ customer.contact_number or '—' }}</td>
+                            <td>{{ customer.ic_number or '—' }}</td>
+                            <td>{{ customer.address[:60] if customer.address else '—' }}{% if customer.address and customer.address|length > 60 %}...{% endif %}</td>
+                            <td>{{ customer.email or '—' }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info view-detail-btn"
+                                        data-customer-id="{{ customer.id }}">
+                                    <i class="fas fa-eye"></i> View All
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% elif request.method == 'POST' %}
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-circle"></i> No records found for "<strong>{{ search_term }}</strong>".
+    </div>
+    {% endif %}
+
+<!-- Customer Detail Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user"></i> Customer Full Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="customerModalBody">
+                <div class="text-center"><div class="spinner-border"></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function () {
+        $('#adminResultsTable').DataTable({
+            pageLength: 25,
+            order: [[1, 'asc']]
+        });
+
+        var customerModal = new bootstrap.Modal(document.getElementById('customerModal'));
+
+        $(document).on('click', '.view-detail-btn', function () {
+            var customerId = $(this).data('customer-id');
+            $('#customerModalBody').html('<div class="text-center"><div class="spinner-border"></div></div>');
+            customerModal.show();
+
+            $.getJSON('/customer/' + customerId + '/detail', function (data) {
+                var html = '<table class="table table-bordered">';
+
+                var core = [
+                    ['Name', data.name],
+                    ['Contact Number', data.contact_number],
+                    ['IC Number', data.ic_number],
+                    ['Address', data.address],
+                    ['Email', data.email]
+                ];
+
+                core.forEach(function (row) {
+                    html += '<tr><th style="width:35%;background:#f8f9fa">' + row[0] + '</th><td>' + (row[1] || '—') + '</td></tr>';
+                });
+
+                if (data.additional && Object.keys(data.additional).length > 0) {
+                    html += '<tr><td colspan="2" class="table-secondary fw-bold">Additional Information from Excel</td></tr>';
+                    Object.entries(data.additional).forEach(function ([key, value]) {
+                        html += '<tr><th style="width:35%;background:#f8f9fa">' + key + '</th><td>' + (value || '—') + '</td></tr>';
+                    });
+                } else {
+                    html += '<tr><td colspan="2" class="text-muted">No additional fields.</td></tr>';
+                }
+
+                html += '</table>';
+                $('#customerModalBody').html(html);
+            });
+        });
+    });
+</script>
+{% endblock %}

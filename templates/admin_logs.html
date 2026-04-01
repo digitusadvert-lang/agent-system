@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2><i class="fas fa-history"></i> System Logs</h2>
+        </div>
+    </div>
+    
+    <ul class="nav nav-tabs mb-3" id="logTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login" type="button" role="tab">
+                <i class="fas fa-sign-in-alt"></i> Login Logs
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="search-tab" data-bs-toggle="tab" data-bs-target="#search" type="button" role="tab">
+                <i class="fas fa-search"></i> Search Logs
+            </button>
+        </li>
+    </ul>
+    
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="login" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Agent Login Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="loginTable">
+                            <thead>
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Login Time</th>
+                                    <th>Logout Time</th>
+                                    <th>Duration</th>
+                                    <th>IP Address</th>
+                                    <th>Connection Type</th>
+                                    <th>Session ID</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in login_logs %}
+                                <tr>
+                                    <td>{{ log.user.full_name if log.user else 'Unknown' }}</td>
+                                    <td>{{ log.login_time.strftime('%Y-%m-%d %H:%M:%S') if log.login_time else '-' }}</td>
+                                    <td>{{ log.logout_time.strftime('%Y-%m-%d %H:%M:%S') if log.logout_time else 'Active' }}</td>
+                                    <td>
+                                        {% if log.session_duration %}
+                                            {{ (log.session_duration // 3600) }}h 
+                                            {{ ((log.session_duration % 3600) // 60) }}m 
+                                            {{ (log.session_duration % 60) }}s
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ log.ip_address }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if log.connection_type == 'wifi' %}info{% else %}warning{% endif %}">
+                                            {{ log.connection_type|upper }}
+                                        </span>
+                                    </td>
+                                    <td><code>{{ log.session_id[:8] }}...</code></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="tab-pane fade" id="search" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Agent Search Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="searchTable">
+                            <thead>
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Search Term</th>
+                                    <th>Search Type</th>
+                                    <th>Results</th>
+                                    <th>Timestamp</th>
+                                    <th>IP Address</th>
+                                    <th>Screenshot</th>
+                                    <th>Downloaded</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in search_logs %}
+                                <tr>
+                                    <td>{{ log.user.full_name if log.user else 'Unknown' }}</td>
+                                    <td><strong>{{ log.search_term }}</strong></td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ log.search_type|upper }}</span>
+                                    </td>
+                                    <td>{{ log.results_count }}</td>
+                                    <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>{{ log.ip_address }}</td>
+                                    <td>
+                                        {% if log.screenshot_taken %}
+                                            <i class="fas fa-check-circle text-success"></i> Yes
+                                        {% else %}
+                                            <i class="fas fa-times-circle text-danger"></i> No
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if log.data_downloaded %}
+                                            <i class="fas fa-check-circle text-success"></i> Yes
+                                        {% else %}
+                                            <i class="fas fa-times-circle text-danger"></i> No
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#loginTable').DataTable({
+            pageLength: 25,
+            order: [[1, 'desc']]
+        });
+        
+        $('#searchTable').DataTable({
+            pageLength: 25,
+            order: [[4, 'desc']]
+        });
+    });
+</script>
+{% endblock %}

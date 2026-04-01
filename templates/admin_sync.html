@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block page_title %}Sync Data{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Sync / Update Data</h2>
+    <p>Upload a new version of the Excel file to update existing records</p>
+</div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card border-primary mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-upload"></i> Upload New Version</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Upload the latest Excel file. The system will:</p>
+                    <ul class="text-muted mb-3">
+                        <li><strong>Update</strong> existing records matched by IC or phone number</li>
+                        <li><strong>Insert</strong> brand new records not yet in the system</li>
+                        <li><strong>Skip</strong> records that have not changed</li>
+                    </ul>
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Select Excel File</label>
+                            <input type="file" class="form-control" name="file"
+                                   accept=".xlsx,.xls" required>
+                            <div class="form-text">Accepts .xlsx and .xls files</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-sync-alt"></i> Start Sync
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> Recent Syncs</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_syncs %}
+                    <table class="table table-sm table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>File</th>
+                                <th>Date</th>
+                                <th>Rows</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in recent_syncs %}
+                            <tr>
+                                <td class="small">{{ s.filename | truncate(30) }}</td>
+                                <td class="small">{{ s.upload_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ s.row_count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="p-3 text-muted">No syncs yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

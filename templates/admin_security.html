@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block page_title %}Security Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Security Settings</h2>
+    <p>Configure password policy, Telegram approval and manage admin trusted devices</p>
+</div>
+
+{% if system_locked %}
+<div class="alert alert-danger d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <i class="fas fa-lock me-2"></i>
+        <strong>System is currently LOCKED.</strong> No one can log in.
+        <div style="font-size:12px;margin-top:4px;opacity:0.8">{{ lock_reason }}</div>
+    </div>
+    <a href="{{ url_for('unlock_system') }}" class="btn btn-sm btn-light ms-3"
+       onclick="return confirm('Unlock the system?')">
+        <i class="fas fa-unlock me-1"></i> Unlock Now
+    </a>
+</div>
+{% endif %}
+
+<div class="row g-3">
+
+    <!-- PASSWORD EXPIRY POLICY -->
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-clock me-2 text-warning"></i> Password Expiry Policy
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4" style="font-size:13.5px">
+                    Agents will be forced to change their password after this period.
+                    Set to <strong>0</strong> to disable expiry.
+                </p>
+                <form method="POST">
+                    <input type="hidden" name="action" value="password_policy">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Expiry Period</label>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            {% for days, label in [('0','No Expiry'),('3','3 Days'),('7','7 Days'),('14','14 Days'),('30','30 Days')] %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="password_expiry_days"
+                                       id="exp_{{ days }}" value="{{ days }}"
+                                       {% if current_expiry == days %}checked{% endif %}>
+                                <label class="form-check-label fw-500" for="exp_{{ days }}">
+                                    {{ label }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mb-3" style="font-size:13px">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Current setting:
+                        <strong>
+                            {% if current_expiry == '0' %}No expiry{% else %}{{ current_expiry }} days{% endif %}
+                        </strong>
+                        — Saving will immediately flag agents whose passwords are overdue.
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save me-2"></i> Save Policy
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN DEVICES -->
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-laptop me-2 text-primary"></i> Admin Login Devices</span>
+                <span class="text-muted small">Unrecognised devices can still log in but are flagged</span>
+            </div>
+            <div class="card-body p-0">
+                {% if admin_devices %}
+                <table class="table mb-0" id="adminDevTable">
+                    <thead>
+                        <tr>
+                            <th>Admin</th>
+                            <th>Label / IP</th>
+                            <th>Status</th>
+                            <th>First Seen</th>
+                            <th>Last Seen</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for d in admin_devices %}
+                        <tr>
+                            <td style="font-size:13px;font-weight:600">{{ d.user.full_name }}</td>
+                            <td>
+                                <div style="font-size:13px">{{ d.label }}</div>
+                                <code style="font-size:11px;color:#94a3b8">{{ d.ip_address }}</code>
+                            </td>
+                            <td>
+                                {% if d.status == 'trusted' %}
+                                    <span class="badge bg-success">Trusted</span>
+                                {% elif d.status == 'blocked' %}
+                                    <span class="badge bg-danger">Blocked</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">Unrecognised</span>
+                                {% endif %}
+                            </td>
+                            <td style="font-size:12px;color:#94a3b8">{{ d.first_seen.strftime('%d %b %Y %H:%M') }}</td>
+                            <td style="font-size:12px;color:#94a3b8">{{ d.last_seen.strftime('%d %b %Y %H:%M') }}</td>
+                            <td>
+                                {% if d.status != 'trusted' %}
+                                <a href="{{ url_for('trust_admin_device', device_id=d.id) }}"
+                                   class="btn btn-sm btn-success me-1"
+                                   onclick="return confirm('Mark as trusted?')">
+                                    <i class="fas fa-check"></i> Trust
+                                </a>
+                                {% endif %}
+                                {% if d.status != 'blocked' %}
+                                <a href="{{ url_for('block_admin_device', device_id=d.id) }}"
+                                   class="btn btn-sm btn-warning me-1"
+                                   onclick="return confirm('Block this device?')">
+                                    <i class="fas fa-ban"></i>
+                                </a>
+                                {% endif %}
+                                <a href="{{ url_for('delete_admin_device', device_id=d.id) }}"
+                                   class="btn btn-sm btn-outline-danger"
+                                   onclick="return confirm('Remove this device?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-4 text-muted text-center">
+                    <i class="fas fa-laptop fa-2x mb-2 d-block"></i>
+                    No admin devices recorded yet.<br>
+                    <small>Devices appear here after admin logins.</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- TELEGRAM APPROVAL -->
+<div class="row g-3 mt-1">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fab fa-telegram me-2 text-primary"></i> Telegram Approval for Admin Login
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3" style="font-size:13.5px">
+                    When enabled, admin logins from unrecognised devices will require boss approval via Telegram before access is granted.
+                    If no response within <strong>30 minutes</strong>, the system locks all logins.
+                </p>
+                <form method="POST">
+                    <input type="hidden" name="action" value="telegram_settings">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="tg_enabled"
+                                   name="telegram_enabled" {% if telegram_enabled == '1' %}checked{% endif %}>
+                            <label class="form-check-label fw-bold" for="tg_enabled">
+                                Enable Telegram Approval
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Bot Token</label>
+                        <input type="text" class="form-control" name="telegram_bot_token"
+                               value="{{ telegram_bot_token }}"
+                               placeholder="1234567890:ABCDEFabcdef...">
+                        <div class="form-text">Get from <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on Telegram</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Boss Chat ID</label>
+                        <input type="text" class="form-control" name="telegram_boss_chat_id"
+                               value="{{ telegram_boss_chat_id }}"
+                               placeholder="e.g. 123456789">
+                        <div class="form-text">Send a message to your bot then visit:
+                            <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fab fa-telegram me-2"></i> Save Telegram Settings
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2 text-warning"></i> Setup Guide
+            </div>
+            <div class="card-body">
+                <ol style="font-size:13.5px;color:#374151;line-height:2">
+                    <li>Open Telegram and message <strong>@BotFather</strong></li>
+                    <li>Type <code>/newbot</code> and follow the steps to create a bot</li>
+                    <li>Copy the <strong>Bot Token</strong> and paste it above</li>
+                    <li>Start a chat with your new bot (send any message)</li>
+                    <li>Visit <code>api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code> to get your <strong>Chat ID</strong></li>
+                    <li>Set your Telegram webhook URL to:<br>
+                        <code style="font-size:11.5px;word-break:break-all">https://yourdomain.com/telegram/webhook</code><br>
+                        <small class="text-muted">(For localhost testing use <a href="https://ngrok.com" target="_blank">ngrok</a>)</small>
+                    </li>
+                    <li>Enable the toggle and save</li>
+                </ol>
+                <div class="alert alert-info mt-2 mb-0" style="font-size:12.5px">
+                    <i class="fas fa-laptop me-1"></i>
+                    <strong>Local testing:</strong> Run <code>ngrok http 5000</code> then register the webhook using the ngrok URL.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PHASE 2 TOGGLE -->
+<div class="row g-3 mt-1">
+    <div class="col-12">
+        <div class="card" style="border:1px solid rgba(99,102,241,0.3);background:linear-gradient(135deg,rgba(99,102,241,0.05),rgba(139,92,246,0.05))">
+            <div class="card-header" style="background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(139,92,246,0.15));border-bottom:1px solid rgba(99,102,241,0.2)">
+                <i class="fas fa-rocket me-2" style="color:#a78bfa"></i>
+                <span style="color:#6366f1;font-weight:700">Phase 2 — Extended Data Module</span>
+                <span class="badge ms-2" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);font-size:10px">COMING SOON</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3" style="font-size:13.5px">
+                    Enable this to show the Phase 2 section in the sidebar. Phase 2 features are currently in development.
+                </p>
+                <form method="POST">
+                    <input type="hidden" name="action" value="phase2_toggle">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="phase2_enabled"
+                               name="phase2_enabled" {% if phase2_enabled %}checked{% endif %}>
+                        <label class="form-check-label fw-bold" for="phase2_enabled">
+                            Enable Phase 2 Module
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-sm" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white">
+                        <i class="fas fa-save me-1"></i> Save
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function () {
+        $('#adminDevTable').DataTable({ pageLength: 10, order: [[3, 'desc']] });
+    });
+</script>
+{% endblock %}

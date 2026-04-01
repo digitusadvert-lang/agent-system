@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-exclamation-triangle"></i> Resolve Duplicate Records</h4>
+                    <p class="mb-0">Upload: {{ upload.filename }} ({{ upload.upload_date.strftime('%Y-%m-%d %H:%M') }})</p>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle"></i>
+                        Found {{ duplicates|length }} duplicate records. Please choose how to handle each duplicate.
+                    </div>
+                    
+                    <form method="POST">
+                        {% for duplicate in duplicates %}
+                        <div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <strong>Duplicate Record #{{ loop.index }}</strong>
+                                {% if duplicate.match_type %}
+                                <span class="badge bg-info ms-2">Matched by: {{ duplicate.match_type }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Existing Record:</h6>
+                                        {% set customer = duplicate.customer %}
+                                        {% if customer %}
+                                        <table class="table table-sm table-bordered">
+                                            <tr>
+                                                <th style="width: 40%;">Name:</th>
+                                                <td>{{ customer.name }}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Contact:</th>
+                                                <td>{{ customer.contact_number }}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>IC:</th>
+                                                <td>{{ customer.ic_number }}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Address:</th>
+                                                <td>{{ customer.address }}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Email:</th>
+                                                <td>{{ customer.email }}</td>
+                                            </tr>
+                                        </table>
+                                        {% else %}
+                                        <p class="text-danger">Customer record not found</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>New Record Data:</h6>
+                                        <div style="max-height: 300px; overflow-y: auto;">
+                                            <table class="table table-sm table-bordered">
+                                                {% for key, value in duplicate.duplicate_data_parsed.items() %}
+                                                <tr>
+                                                    <th style="width: 40%;">{{ key }}:</th>
+                                                    <td>{{ value }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <label class="form-label"><strong>Action to take:</strong></label>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="duplicate_{{ duplicate.id }}" value="update" id="update_{{ duplicate.id }}" checked>
+                                                <label class="form-check-label" for="update_{{ duplicate.id }}">
+                                                    <i class="fas fa-edit"></i> Update existing record
+                                                </label>
+                                                <div class="small text-muted">Replace old data with new data</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="duplicate_{{ duplicate.id }}" value="merge" id="merge_{{ duplicate.id }}">
+                                                <label class="form-check-label" for="merge_{{ duplicate.id }}">
+                                                    <i class="fas fa-code-branch"></i> Merge data
+                                                </label>
+                                                <div class="small text-muted">Keep existing, add new fields</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="duplicate_{{ duplicate.id }}" value="skip" id="skip_{{ duplicate.id }}">
+                                                <label class="form-check-label" for="skip_{{ duplicate.id }}">
+                                                    <i class="fas fa-skip"></i> Skip this record
+                                                </label>
+                                                <div class="small text-muted">Keep existing only</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary" onclick="return confirm('Are you sure you want to apply these actions?')">
+                                <i class="fas fa-check"></i> Apply Actions
+                            </button>
+                            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

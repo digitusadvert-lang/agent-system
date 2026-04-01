@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block page_title %}Device Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Device Management</h2>
+    <p>Approve or block agent devices. Only approved devices can view customer data.</p>
+</div>
+
+{% if pending %}
+<div class="card mb-4 border-warning">
+    <div class="card-header" style="background:#fffbeb;border-bottom:1px solid #fde68a">
+        <span style="color:#92400e;font-weight:700">
+            <i class="fas fa-clock me-2"></i>Pending Approval
+            <span class="badge bg-warning text-dark ms-2">{{ pending|length }}</span>
+        </span>
+    </div>
+    <div class="card-body p-0">
+        <table class="table mb-0">
+            <thead>
+                <tr>
+                    <th>Agent</th>
+                    <th>IP Address</th>
+                    <th>Device Label</th>
+                    <th>First Seen</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in pending %}
+                <tr>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700">
+                                {{ d.user.full_name[:1] }}
+                            </div>
+                            <div>
+                                <div style="font-weight:600;font-size:13px">{{ d.user.full_name }}</div>
+                                <div style="font-size:11px;color:#94a3b8">{{ d.user.username }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><code style="font-size:12px">{{ d.ip_address }}</code></td>
+                    <td>
+                        <form method="POST" action="{{ url_for('label_device', device_id=d.id) }}" class="d-flex gap-1">
+                            <input type="text" class="form-control form-control-sm" name="label"
+                                   value="{{ d.label }}" placeholder="e.g. Office PC" style="max-width:160px">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-save"></i>
+                            </button>
+                        </form>
+                    </td>
+                    <td style="font-size:12px;color:#94a3b8">{{ d.first_seen.strftime('%d %b %Y %H:%M') }}</td>
+                    <td>
+                        <a href="{{ url_for('approve_device', device_id=d.id) }}"
+                           class="btn btn-sm btn-success me-1"
+                           onclick="return confirm('Approve this device?')">
+                            <i class="fas fa-check"></i> Approve
+                        </a>
+                        <a href="{{ url_for('block_device', device_id=d.id) }}"
+                           class="btn btn-sm btn-danger"
+                           onclick="return confirm('Block this device?')">
+                            <i class="fas fa-ban"></i> Block
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <i class="fas fa-laptop me-2 text-primary"></i> All Registered Devices
+    </div>
+    <div class="card-body p-0">
+        <table class="table mb-0" id="devicesTable">
+            <thead>
+                <tr>
+                    <th>Agent</th>
+                    <th>Label</th>
+                    <th>IP Address</th>
+                    <th>Fingerprint</th>
+                    <th>Status</th>
+                    <th>Last Seen</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in all_devices %}
+                <tr>
+                    <td style="font-size:13px;font-weight:600">{{ d.user.full_name }}</td>
+                    <td style="font-size:13px">{{ d.label }}</td>
+                    <td><code style="font-size:12px">{{ d.ip_address }}</code></td>
+                    <td><code style="font-size:11px;color:#94a3b8">{{ d.fingerprint[:16] }}...</code></td>
+                    <td>
+                        {% if d.status == 'approved' %}
+                            <span class="badge bg-success">Approved</span>
+                        {% elif d.status == 'blocked' %}
+                            <span class="badge bg-danger">Blocked</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:12px;color:#94a3b8">{{ d.last_seen.strftime('%d %b %Y %H:%M') }}</td>
+                    <td>
+                        {% if d.status != 'approved' %}
+                        <a href="{{ url_for('approve_device', device_id=d.id) }}"
+                           class="btn btn-sm btn-success me-1"
+                           onclick="return confirm('Approve?')">
+                            <i class="fas fa-check"></i>
+                        </a>
+                        {% endif %}
+                        {% if d.status != 'blocked' %}
+                        <a href="{{ url_for('block_device', device_id=d.id) }}"
+                           class="btn btn-sm btn-warning me-1"
+                           onclick="return confirm('Block?')">
+                            <i class="fas fa-ban"></i>
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('delete_device', device_id=d.id) }}"
+                           class="btn btn-sm btn-outline-danger"
+                           onclick="return confirm('Remove this device record?')">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function () {
+        $('#devicesTable').DataTable({ pageLength: 25, order: [[5, 'desc']] });
+    });
+</script>
+{% endblock %}
