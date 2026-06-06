@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block page_title %}Scan in Progress{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-spinner fa-spin me-2 text-primary"></i>Scanning Database…</h2>
+    <p>Please wait while the scan runs. This page updates automatically.</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-body p-4">
+
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span id="scanMsg" class="text-muted" style="font-size:13.5px">Initializing…</span>
+                    <span id="scanPct" class="fw-bold" style="font-size:13.5px;color:#6366f1">0%</span>
+                </div>
+
+                <div class="progress mb-4" style="height:12px;border-radius:8px;background:#eef0f8">
+                    <div id="scanBar"
+                         class="progress-bar"
+                         style="width:0%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:8px;transition:width 0.6s ease">
+                    </div>
+                </div>
+
+                <div id="statsBox" class="d-none">
+                    <hr class="my-3">
+                    <div class="row g-2 text-center" id="statCards"></div>
+                </div>
+
+                <div id="errorBox" class="alert alert-danger d-none mt-3"></div>
+
+                <div class="text-center mt-4" id="doneBtns" style="display:none!important">
+                    <a id="reportLink" href="#" class="btn btn-primary">
+                        <i class="fas fa-chart-bar me-2"></i>View Report
+                    </a>
+                    <a href="{{ url_for('admin_db_scan') }}" class="btn btn-secondary ms-2">
+                        <i class="fas fa-redo me-2"></i>Scan Again
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const JOB_ID    = {{ job_id | tojson }};
+const STATUS_URL = "{{ url_for('admin_db_scan_status', job_id=job_id) }}";
+const REPORT_URL = "{{ url_for('admin_db_scan_report', job_id=job_id) }}";
+let   pollTimer  = null;
+
+function poll() {
+    fetch(STATUS_URL)
+        .then(r => r.json())
+        .then(data => {
+            const pct = data.progress || 0;
+            document.getElementById('scanBar').style.width = pct + '%';
+            document.getElementById('scanPct').textContent  = pct + '%';
+            document.getElementById('scanMsg').textContent  = data.message || '…';
+
+            if (data.status === 'done') {
+                clearInterval(pollTimer);
+                document.getElementById('scanBar').style.width = '100%';
+                document.getElementById('scanPct').textContent  = '100%';
+
+                // Show summary cards
+                const s = data.summary || {};
+                const box = document.getElementById('statsBox');
+                const cards = document.getElementById('statCards');
+                box.classList.remove('d-none');
+                cards.innerHTML = `
+                    <div class="col-4">
+                        <div class="p-3 rounded" style="background:#f0f2f5">
+                            <div style="font-size:22px;font-weight:700;color:#6366f1">${(s.ic_groups||0).toLocaleString()}</div>
+                            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600">IC Groups</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded" style="background:#f0f2f5">
+                            <div style="font-size:22px;font-weight:700;color:#ec4899">${(s.phone_groups||0).toLocaleString()}</div>
+                            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600">Phone Groups</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded" style="background:#f0f2f5">
+                            <div style="font-size:22px;font-weight:700;color:#f59e0b">${(s.name_groups||0).toLocaleString()}</div>
+                            <div style="font-size:11px;color:#64748b;text-transform:uppercase;font-weight:600">Name Groups</div>
+                        </div>
+                    </div>`;
+
+                // Show buttons
+                document.getElementById('reportLink').href = REPORT_URL;
+                const btns = document.getElementById('doneBtns');
+                btns.style.removeProperty('display');
+                btns.classList.remove('d-none');
+
+                // Auto-redirect after 2 s
+                setTimeout(() => { window.location.href = REPORT_URL; }, 2000);
+            }
+
+            if (data.status === 'error') {
+                clearInterval(pollTimer);
+                const eb = document.getElementById('errorBox');
+                eb.textContent = 'Scan failed: ' + (data.message || 'Unknown error');
+                eb.classList.remove('d-none');
+            }
+        })
+        .catch(() => {});   // silently retry
+}
+
+pollTimer = setInterval(poll, 1500);
+poll();  // immediate first call
+</script>
+{% endblock %}

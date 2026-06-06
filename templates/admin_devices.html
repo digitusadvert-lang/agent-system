@@ -16,8 +16,9 @@
         </span>
     </div>
     <div class="card-body p-0">
+        <div style="max-height:400px;overflow-y:auto">
         <table class="table mb-0">
-            <thead>
+            <thead style="position:sticky;top:0;z-index:1">
                 <tr>
                     <th>Agent</th>
                     <th>IP Address</th>
@@ -40,7 +41,15 @@
                             </div>
                         </div>
                     </td>
-                    <td><code style="font-size:12px">{{ d.ip_address }}</code></td>
+                    <td>
+                        {% if d.pending_ip %}
+                            <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:10px;font-weight:600">IP Change</span><br>
+                            <code style="font-size:11px;color:#94a3b8;text-decoration:line-through">{{ d.ip_address }}</code><br>
+                            <code style="font-size:12px">{{ d.pending_ip }}</code>
+                        {% else %}
+                            <code style="font-size:12px">{{ d.ip_address }}</code>
+                        {% endif %}
+                    </td>
                     <td>
                         <form method="POST" action="{{ url_for('label_device', device_id=d.id) }}" class="d-flex gap-1">
                             <input type="text" class="form-control form-control-sm" name="label"
@@ -67,6 +76,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 {% endif %}
@@ -91,7 +101,11 @@
             <tbody>
                 {% for d in all_devices %}
                 <tr>
-                    <td style="font-size:13px;font-weight:600">{{ d.user.full_name }}</td>
+                    <td>
+                        <div style="font-size:13px;font-weight:600">{{ d.user.full_name }}</div>
+                        {% set agent_approved = all_devices | selectattr('user_id', 'equalto', d.user_id) | selectattr('status', 'equalto', 'approved') | list | length %}
+                        <small class="text-muted">{{ agent_approved }} device(s) approved</small>
+                    </td>
                     <td style="font-size:13px">{{ d.label }}</td>
                     <td><code style="font-size:12px">{{ d.ip_address }}</code></td>
                     <td><code style="font-size:11px;color:#94a3b8">{{ d.fingerprint[:16] }}...</code></td>

@@ -1,0 +1,365 @@
+{% extends 'base.html' %}
+{% block page_title %}Duplicate Scan Report{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+        <h2><i class="fas fa-clone me-2 text-primary"></i>Duplicate Scan Report</h2>
+        <p>Review and clean up duplicate records found in the database.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('admin_db_scan_flagged_cases_download') }}" class="btn btn-outline-danger btn-sm">
+            <i class="fas fa-download me-1"></i>Download Suspect IC File
+            <span class="badge bg-danger ms-1">{{ suspect_flag_count or 0 }}</span>
+        </a>
+        <a href="{{ url_for('admin_db_scan') }}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-redo me-1"></i>New Scan
+        </a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-th-large me-1"></i>Dashboard
+        </a>
+    </div>
+</div>
+
+{# ── Summary cards ── #}
+{% set s = summary %}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-purple">
+            <div class="stat-icon"><i class="fas fa-database"></i></div>
+            <div class="stat-value">{{ "{:,}".format(s.total_records or 0) }}</div>
+            <div class="stat-label">Total Records</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-pink">
+            <div class="stat-icon"><i class="fas fa-id-card"></i></div>
+            <div class="stat-value">{{ s.ic_groups or 0 }}</div>
+            <div class="stat-label">IC Dup Groups<br><small style="opacity:.7">{{ s.ic_records or 0 }} records</small></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-blue">
+            <div class="stat-icon"><i class="fas fa-phone"></i></div>
+            <div class="stat-value">{{ s.phone_groups or 0 }}</div>
+            <div class="stat-label">Phone Dup Groups<br><small style="opacity:.7">{{ s.phone_records or 0 }} records</small></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-orange">
+            <div class="stat-icon"><i class="fas fa-user"></i></div>
+            <div class="stat-value">{{ s.name_groups or 0 }}</div>
+            <div class="stat-label">Name Dup Groups<br><small style="opacity:.7">{{ s.name_records or 0 }} records</small></div>
+        </div>
+    </div>
+</div>
+
+{# ── Filter tabs ── #}
+<ul class="nav nav-tabs mb-3" style="font-size:13.5px;font-weight:600">
+    <li class="nav-item">
+        <a class="nav-link {% if filter_type == 'ic' %}active{% endif %}"
+           href="{{ url_for('admin_db_scan_report', job_id=job_id, type='ic') }}">
+            <i class="fas fa-id-card me-1"></i>IC Duplicates
+            <span class="badge bg-danger ms-1">{{ s.ic_groups or 0 }}</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if filter_type == 'phone' %}active{% endif %}"
+           href="{{ url_for('admin_db_scan_report', job_id=job_id, type='phone') }}">
+            <i class="fas fa-phone me-1"></i>Phone Duplicates
+            <span class="badge bg-primary ms-1">{{ s.phone_groups or 0 }}</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if filter_type == 'name' %}active{% endif %}"
+           href="{{ url_for('admin_db_scan_report', job_id=job_id, type='name') }}">
+            <i class="fas fa-user me-1"></i>Name Duplicates
+            <span class="badge bg-warning text-dark ms-1">{{ s.name_groups or 0 }}</span>
+        </a>
+    </li>
+</ul>
+
+{# ── Group info bar ── #}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <span class="text-muted" style="font-size:13px">
+        Showing <strong>{{ groups | length }}</strong> of <strong>{{ total_groups }}</strong>
+        {{ filter_type }} duplicate group(s) — page {{ page }} / {{ total_pages }}
+    </span>
+    <div class="d-flex gap-2 flex-wrap">
+        {% if filter_type == 'ic' %}
+        <div class="alert alert-danger py-1 px-3 mb-0" style="font-size:12px">
+            <i class="fas fa-user-secret me-1"></i>
+            Flag suspicious IC groups if the same IC is used by clearly different people.
+        </div>
+        {% endif %}
+        {% if filter_type == 'name' %}
+        <div class="alert alert-warning py-1 px-3 mb-0" style="font-size:12px">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            Name matches may be different people. Review carefully before deleting.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# ── Duplicate group cards ── #}
+<div id="groupContainer">
+{% if groups %}
+    {% for group in groups %}
+    <div class="card mb-3 group-card" id="group-{{ loop.index }}"
+         data-type="{{ group.type }}" data-key="{{ group.key }}" data-ids="{{ group.ids | join(',') }}">
+        <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+                {% if group.type == 'ic' %}
+                    <span class="badge bg-danger">IC</span>
+                {% elif group.type == 'phone' %}
+                    <span class="badge bg-primary">Phone</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark">Name</span>
+                {% endif %}
+                <span style="font-size:13px">
+                    Duplicate key: <code>{{ group.key }}</code>
+                </span>
+                <span class="badge bg-secondary">{{ group.customers | length }} records</span>
+                {% if group.signal and group.signal.is_suspect %}
+                    <span class="badge {% if group.signal.severity == 'high' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                        Suspect IC
+                    </span>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-1 flex-wrap">
+                {% if group.type == 'ic' %}
+                <button class="btn btn-sm btn-danger resolve-btn"
+                        data-action="flag_suspect"
+                        data-type="{{ group.type }}"
+                        data-key="{{ group.key }}">
+                    <i class="fas fa-flag me-1"></i>Flag Suspect IC
+                </button>
+                {% endif %}
+                <button class="btn btn-sm btn-success resolve-btn"
+                        data-action="keep_first"
+                        data-type="{{ group.type }}"
+                        data-key="{{ group.key }}">
+                    <i class="fas fa-check me-1"></i>Keep First + Merge
+                </button>
+                <button class="btn btn-sm btn-warning resolve-btn"
+                        data-action="keep_last"
+                        data-type="{{ group.type }}"
+                        data-key="{{ group.key }}">
+                    <i class="fas fa-check me-1"></i>Keep Last + Merge
+                </button>
+                <button class="btn btn-sm btn-primary resolve-btn"
+                        data-action="merge"
+                        data-type="{{ group.type }}"
+                        data-key="{{ group.key }}">
+                    <i class="fas fa-compress-arrows-alt me-1"></i>Merge to Best Master
+                </button>
+                <button class="btn btn-sm btn-outline-secondary resolve-btn"
+                        data-action="skip"
+                        data-type="{{ group.type }}"
+                        data-key="{{ group.key }}">
+                    Skip
+                </button>
+            </div>
+        </div>
+        <div class="px-3 pb-2 text-muted small">
+            Merge keeps one master record and preserves unique names, phones, emails, and addresses in its profile history.
+            {% if group.signal and group.signal.summary %}
+            <div class="mt-2 {% if group.signal.is_suspect %}text-danger fw-semibold{% endif %}">
+                <i class="fas {% if group.signal.is_suspect %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %} me-1"></i>
+                {{ group.signal.summary }}
+            </div>
+            {% endif %}
+            {% if group.signal and group.signal.reasons %}
+            <div class="mt-1">
+                {% for reason in group.signal.reasons %}
+                    <span class="badge bg-light text-dark border me-1 mb-1">{{ reason }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:50px">ID</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>IC</th>
+                            <th>Address</th>
+                            <th>Email</th>
+                            <th style="width:110px">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for customer in group.customers %}
+                        <tr>
+                            <td><code>{{ customer.id }}</code></td>
+                            <td>{{ customer.name or '—' }}</td>
+                            <td>{{ customer.contact_number or '—' }}</td>
+                            <td>{{ customer.ic_number or '—' }}</td>
+                            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                                title="{{ customer.address or '' }}">
+                                {{ customer.address or '—' }}
+                            </td>
+                            <td>{{ customer.email or '—' }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-success keep-this-btn"
+                                        style="font-size:11px;padding:3px 8px"
+                                        data-id="{{ customer.id }}"
+                                        data-type="{{ group.type }}"
+                                        data-key="{{ group.key }}">
+                                    <i class="fas fa-star me-1"></i>Keep This
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="card">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+            <p class="mb-0 fw-semibold">No {{ filter_type }} duplicates remaining on this page.</p>
+        </div>
+    </div>
+{% endif %}
+</div>
+
+{# ── Pagination ── #}
+{% if total_pages > 1 %}
+<nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center flex-wrap gap-1">
+        {% if page > 1 %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('admin_db_scan_report', job_id=job_id, type=filter_type, page=page-1) }}">
+                &laquo; Prev
+            </a>
+        </li>
+        {% endif %}
+        {% for p in range(1, total_pages + 1) %}
+            {% if p == page %}
+            <li class="page-item active">
+                <span class="page-link">{{ p }}</span>
+            </li>
+            {% elif p <= 3 or p > total_pages - 3 or (p >= page - 2 and p <= page + 2) %}
+            <li class="page-item">
+                <a class="page-link"
+                   href="{{ url_for('admin_db_scan_report', job_id=job_id, type=filter_type, page=p) }}">{{ p }}</a>
+            </li>
+            {% elif p == 4 and page > 6 %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% elif p == total_pages - 3 and page < total_pages - 5 %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+        {% endfor %}
+        {% if page < total_pages %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('admin_db_scan_report', job_id=job_id, type=filter_type, page=page+1) }}">
+                Next &raquo;
+            </a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{# ── Toast notification ── #}
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+    <div id="actionToast" class="toast align-items-center border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold" id="toastMsg">Done.</div>
+            <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const RESOLVE_URL = "{{ url_for('admin_db_scan_resolve', job_id=job_id) }}";
+const toastEl     = document.getElementById('actionToast');
+const bsToast     = new bootstrap.Toast(toastEl, {delay: 3500});
+
+function showToast(msg, ok) {
+    document.getElementById('toastMsg').textContent = msg;
+    toastEl.className = 'toast align-items-center border-0 text-white ' +
+                        (ok ? 'bg-success' : 'bg-danger');
+    bsToast.show();
+}
+
+function resolveGroup(action, groupType, groupKey, keepId) {
+    const card = document.querySelector(
+        `.group-card[data-type="${groupType}"][data-key="${CSS.escape(groupKey)}"]`
+    );
+
+    // Dim card while waiting
+    if (card) card.style.opacity = '0.4';
+
+    const rawIds = card ? (card.dataset.ids || '') : '';
+    const ids = rawIds.split(',').map(v => parseInt(v, 10)).filter(Number.isFinite);
+    const body = {action, group_type: groupType, group_key: groupKey, ids};
+    if (keepId) body.keep_id = keepId;
+
+    fetch(RESOLVE_URL, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            showToast(data.message, true);
+            // Fade out and remove the card
+            if (card) {
+                card.style.transition = 'opacity 0.4s';
+                card.style.opacity    = '0';
+                setTimeout(() => card.remove(), 450);
+            }
+        } else {
+            showToast(data.message || 'Error', false);
+            if (card) card.style.opacity = '1';
+        }
+    })
+    .catch(err => {
+        showToast('Network error: ' + err, false);
+        if (card) card.style.opacity = '1';
+    });
+}
+
+// Bulk action buttons (Keep First / Keep Last / Merge / Skip)
+document.querySelectorAll('.resolve-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const action = this.dataset.action;
+        const type   = this.dataset.type;
+        const key    = this.dataset.key;
+
+        if (action === 'merge') {
+            if (!confirm(`Merge this group into the best master record and preserve unique phones, emails, and addresses? This cannot be undone.`)) return;
+        }
+        if (action === 'flag_suspect') {
+            if (!confirm(`Flag this group as a suspected fake or reused IC and save it into the admin review file?`)) return;
+        }
+        if (action === 'keep_first' || action === 'keep_last') {
+            if (!confirm(`Keep one master record and merge the other records' facts into it? This cannot be undone.`)) return;
+        }
+        resolveGroup(action, type, key, null);
+    });
+});
+
+// Per-row "Keep This" button
+document.querySelectorAll('.keep-this-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const keepId = this.dataset.id;
+        const type   = this.dataset.type;
+        const key    = this.dataset.key;
+        if (!confirm(`Keep record ID ${keepId} as the master record and merge the others into it? This cannot be undone.`)) return;
+        resolveGroup('keep_selected', type, key, keepId);
+    });
+});
+</script>
+{% endblock %}

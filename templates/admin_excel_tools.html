@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block page_title %}Excel Alignment Tool{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2>Excel Alignment Tool</h2>
+        <p>Upload a spreadsheet, map the columns, detect duplicates, and export a database-ready file.</p>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4 class="mb-0"><i class="fas fa-file-excel me-2 text-success"></i>Upload Excel File</h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                This tool creates a cleaned aligned Excel file, a duplicate report, a SQL insert script, and a SQLite database file.
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" class="d-flex gap-2 align-items-end flex-wrap">
+                <input type="hidden" name="action" value="upload">
+                <div class="flex-grow-1">
+                    <label class="form-label" for="file">Excel file</label>
+                    <input type="file" class="form-control" id="file" name="file" accept=".xlsx,.xls" required>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-1"></i>Upload
+                    </button>
+                </div>
+            </form>
+            {% if pending %}
+            <form method="POST" class="mt-3">
+                <input type="hidden" name="action" value="reset">
+                <button type="submit" class="btn btn-secondary">Reset Current File</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if pending %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4 class="mb-0"><i class="fas fa-sliders-h me-2 text-primary"></i>Map and Clean</h4>
+            <div class="text-muted small mt-1">{{ pending.filename }}</div>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                <input type="hidden" name="action" value="process">
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-6">
+                        <div class="card border-danger h-100">
+                            <div class="card-header bg-danger text-white">Required Columns</div>
+                            <div class="card-body">
+                                {% set field_map = [
+                                    ('name_column', 'Name', 'name'),
+                                    ('contact_column', 'Contact Number', 'contact_number'),
+                                    ('ic_column', 'IC Number', 'ic_number')
+                                ] %}
+                                {% for field_name, label, key in field_map %}
+                                <div class="mb-3">
+                                    <label class="form-label">{{ label }}</label>
+                                    <select class="form-select" name="{{ field_name }}" required>
+                                        <option value="">Select column...</option>
+                                        {% for col in pending.available_columns %}
+                                        <option value="{{ col }}" {% if detected.get(key) == col %}selected{% endif %}>{{ col }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card border-success h-100">
+                            <div class="card-header bg-success text-white">Optional Columns and Duplicate Rules</div>
+                            <div class="card-body">
+                                {% set optional_map = [
+                                    ('address_column', 'Address', 'address'),
+                                    ('email_column', 'Email', 'email')
+                                ] %}
+                                {% for field_name, label, key in optional_map %}
+                                <div class="mb-3">
+                                    <label class="form-label">{{ label }}</label>
+                                    <select class="form-select" name="{{ field_name }}">
+                                        <option value="">Not mapped</option>
+                                        {% for col in pending.available_columns %}
+                                        <option value="{{ col }}" {% if detected.get(key) == col %}selected{% endif %}>{{ col }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endfor %}
+
+                                <label class="form-label">Detect duplicates by</label>
+                                <div class="d-flex flex-wrap gap-3 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="duplicate_keys" value="ic_number" id="dup_ic" checked>
+                                        <label class="form-check-label" for="dup_ic">IC Number</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="duplicate_keys" value="contact_number" id="dup_contact" checked>
+                                        <label class="form-check-label" for="dup_contact">Contact Number</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="duplicate_keys" value="email" id="dup_email">
+                                        <label class="form-check-label" for="dup_email">Email</label>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="form-label">Duplicate handling</label>
+                                    <select class="form-select" name="duplicate_strategy">
+                                        <option value="keep_first">Keep first row</option>
+                                        <option value="keep_last">Keep last row</option>
+                                        <option value="keep_all">Keep all rows and report duplicates only</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% if extra_cols %}
+                <div class="card mb-4 border-warning">
+                    <div class="card-header bg-warning text-dark">Extra Columns to Keep</div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Keep</th>
+                                        <th>Original Column</th>
+                                        <th>Rename As</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for col in extra_cols %}
+                                    {% set col_key = col | replace(' ', '_') | replace('.', '_') %}
+                                    <tr>
+                                        <td style="width:90px">
+                                            <input type="checkbox" class="form-check-input" name="extra_include_{{ col_key }}" id="extra_{{ col_key }}" checked>
+                                        </td>
+                                        <td><label for="extra_{{ col_key }}"><code>{{ col }}</code></label></td>
+                                        <td>
+                                            <input type="text" class="form-control" name="extra_label_{{ col_key }}" value="{{ col }}">
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="card mb-4">
+                    <div class="card-header">Preview</div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead>
+                                    <tr>
+                                        {% for col in pending.available_columns %}
+                                        <th>{{ col }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in pending.preview_data %}
+                                    <tr>
+                                        {% for col in pending.available_columns %}
+                                        <td>{{ row.get(col, '') }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-cogs me-1"></i>Process and Export
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if result and result.success %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4 class="mb-0"><i class="fas fa-check-circle me-2 text-success"></i>Export Result</h4>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="alert alert-info mb-0"><strong>Input rows:</strong> {{ result.input_rows }}</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="alert alert-success mb-0"><strong>Output rows:</strong> {{ result.output_rows }}</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="alert alert-warning mb-0"><strong>Duplicate rows:</strong> {{ result.duplicate_rows }}</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="alert alert-danger mb-0"><strong>Removed:</strong> {{ result.duplicates_removed }}</div>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mb-4">
+                <a class="btn btn-success" href="{{ url_for('download_excel_tool_file', filename=result.downloads.aligned_excel) }}">
+                    <i class="fas fa-file-excel me-1"></i>Download Aligned Excel
+                </a>
+                <a class="btn btn-warning" href="{{ url_for('download_excel_tool_file', filename=result.downloads.duplicates_excel) }}">
+                    <i class="fas fa-copy me-1"></i>Download Duplicate Report
+                </a>
+                <a class="btn btn-secondary" href="{{ url_for('download_excel_tool_file', filename=result.downloads.sql) }}">
+                    <i class="fas fa-database me-1"></i>Download SQL
+                </a>
+                <a class="btn btn-dark" href="{{ url_for('download_excel_tool_file', filename=result.downloads.sqlite) }}">
+                    <i class="fas fa-server me-1"></i>Download SQLite DB
+                </a>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">Aligned Preview</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead>
+                                <tr>
+                                    {% for col in result.columns %}
+                                    <th>{{ col }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in result.preview_rows %}
+                                <tr>
+                                    {% for col in result.columns %}
+                                    <td>{{ row.get(col, '') }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% if result.duplicate_rows > 0 %}
+            <div class="card">
+                <div class="card-header">Duplicate Preview</div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead>
+                                <tr>
+                                    {% for col in result.duplicate_columns %}
+                                    <th>{{ col }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in result.duplicate_preview %}
+                                <tr>
+                                    {% for col in result.duplicate_columns %}
+                                    <td>{{ row.get(col, '') }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

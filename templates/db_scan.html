@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block page_title %}Database Duplicate Scan{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+        <h2><i class="fas fa-database me-2 text-primary"></i>Database Duplicate Scan</h2>
+        <p>Slowly crawls every record in the database and groups exact duplicates by IC, phone number, and name.</p>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-play-circle me-2"></i>Start a New Scan
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted mb-3" style="font-size:13.5px">
+                    The scan runs in the background and processes records in batches of 500.
+                    It will not lock the database. Large databases may take a few minutes.
+                </p>
+                <ul class="mb-4" style="font-size:13px;color:#475569">
+                    <li><strong>IC duplicates</strong> — same IC number (digits only, dashes ignored)</li>
+                    <li><strong>Phone duplicates</strong> — same phone number (digits only, country code normalised)</li>
+                    <li><strong>Name duplicates</strong> — exact name match (case-insensitive), only where not already caught by IC/phone</li>
+                </ul>
+                <form method="POST">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Start Scan Now
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-info-circle me-2"></i>How to Use
+            </div>
+            <div class="card-body p-4" style="font-size:13.5px;color:#475569">
+                <ol class="mb-0" style="line-height:2">
+                    <li>Click <strong>Start Scan Now</strong> — a progress page will appear.</li>
+                    <li>Wait for the scan to finish (progress bar reaches 100%).</li>
+                    <li>You'll be taken to the <strong>Report</strong> showing all duplicate groups.</li>
+                    <li>For each group, choose an action:
+                        <ul>
+                            <li><strong>Keep First</strong> — keep oldest record as master and merge the rest into it</li>
+                            <li><strong>Keep Last</strong> — keep newest record as master and merge the rest into it</li>
+                            <li><strong>Keep This</strong> — pick a specific master record and merge the rest into it</li>
+                            <li><strong>Merge</strong> — choose the best master automatically and preserve unique fields</li>
+                            <li><strong>Skip</strong> — leave untouched for now</li>
+                        </ul>
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

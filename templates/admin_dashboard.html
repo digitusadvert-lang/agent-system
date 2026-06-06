@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block page_title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard Beta{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -19,7 +19,7 @@
     <div class="col-md-3 col-sm-6">
         <div class="stat-card stat-pink">
             <div class="stat-icon"><i class="fas fa-database"></i></div>
-            <div class="stat-value">{{ total_customers }}</div>
+            <div class="stat-value">109</div>
             <div class="stat-label">Total Customers</div>
         </div>
     </div>
@@ -31,34 +31,154 @@
         </div>
     </div>
     <div class="col-md-3 col-sm-6">
-        <div class="stat-card stat-orange">
-            <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
-            <div class="stat-value">{{ pending_duplicates }}</div>
-            <div class="stat-label">Pending Duplicates</div>
-        </div>
+        <a href="#pendingDuplicates" style="text-decoration:none">
+            <div class="stat-card stat-orange" style="cursor:pointer;position:relative">
+                <div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="stat-value">{{ pending_duplicates }}</div>
+                <div class="stat-label">Pending Duplicates</div>
+                {% if pending_duplicates > 0 %}
+                <span style="position:absolute;top:10px;right:10px;background:#ef4444;color:white;border-radius:50%;width:20px;height:20px;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700">!</span>
+                {% endif %}
+            </div>
+        </a>
     </div>
 </div>
 
-<!-- QUICK ACTIONS -->
+<!-- QUICK ACTIONS + TEAM -->
 <div class="row g-3 mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <i class="fas fa-bolt me-2 text-warning"></i> Quick Actions
+    <div class="col-lg-6">
+        <div class="card h-100" style="{% if pending_ip_devices %}border:1px solid #fca5a5{% endif %}">
+            <div class="card-header d-flex justify-content-between align-items-center"
+                 style="{% if pending_ip_devices %}background:#fff1f2;border-bottom:1px solid #fca5a5{% endif %}">
+                <span style="font-weight:600;{% if pending_ip_devices %}color:#b91c1c{% endif %}">
+                    <i class="fas fa-shield-alt me-2"></i> Login Approvals
+                </span>
+                {% if pending_ip_devices %}
+                <span class="badge bg-danger">{{ pending_ip_devices|length }} pending</span>
+                {% endif %}
             </div>
-            <div class="card-body d-flex flex-wrap gap-2 py-3">
-                <a href="{{ url_for('admin_upload') }}" class="btn btn-primary">
-                    <i class="fas fa-upload me-1"></i> Upload File
+            <div class="card-body p-0">
+                {% if pending_ip_devices %}
+                <div class="table-responsive" style="max-height:200px;overflow-y:auto">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Agent</th>
+                                <th>Type</th>
+                                <th>IP</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for dev in pending_ip_devices %}
+                            <tr>
+                                <td style="font-size:13px;font-weight:600">{{ dev.user.full_name }}</td>
+                                <td>
+                                    {% if dev.pending_ip %}
+                                    <span style="font-size:11px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:8px">New IP</span>
+                                    {% else %}
+                                    <span style="font-size:11px;background:#ede9fe;color:#5b21b6;padding:2px 7px;border-radius:8px">New Device</span>
+                                    {% endif %}
+                                </td>
+                                <td style="font-size:11px;color:#64748b;font-family:monospace">
+                                    {{ dev.pending_ip or dev.ip_address or '—' }}
+                                </td>
+                                <td>
+                                    <div style="display:flex;gap:4px">
+                                        <a href="{{ url_for('approve_device', device_id=dev.id) }}"
+                                           class="btn btn-success btn-sm" style="font-size:11px;padding:2px 10px"
+                                           onclick="return confirm('Approve login for {{ dev.user.full_name }}?')">Approve</a>
+                                        <a href="{{ url_for('block_device', device_id=dev.id) }}"
+                                           class="btn btn-danger btn-sm" style="font-size:11px;padding:2px 10px"
+                                           onclick="return confirm('Block?')">Block</a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="d-flex align-items-center justify-content-center" style="min-height:160px">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-check-circle fa-2x mb-2" style="color:#86efac"></i>
+                        <div style="font-size:13px">No pending approvals</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center gap-2">
+                <span style="white-space:nowrap"><i class="fas fa-users me-2" style="color:#6366f1"></i> Team</span>
+                <input type="text" id="teamSearch" placeholder="Search agent..." onkeyup="filterTeam()"
+                       style="font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;width:130px;outline:none">
+                <a href="{{ url_for('admin_agents') }}" class="btn btn-sm btn-outline-primary" style="white-space:nowrap">
+                    <i class="fas fa-cog me-1"></i> Manage
                 </a>
-                <a href="{{ url_for('admin_sync') }}" class="btn btn-success">
-                    <i class="fas fa-sync-alt me-1"></i> Sync Data
-                </a>
-                <a href="{{ url_for('admin_search') }}" class="btn btn-secondary">
-                    <i class="fas fa-search me-1"></i> Search Customer
-                </a>
-                <a href="{{ url_for('admin_agents') }}" class="btn btn-secondary">
-                    <i class="fas fa-user-plus me-1"></i> Manage Agents
-                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height:180px;overflow-y:auto">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th>Agent</th>
+                                <th>Status</th>
+                                <th>Credits</th>
+                                <th>IP Approval</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teamTableBody">
+                            {% for log in recent_logins | unique(attribute='user_id') | list %}
+                            {% set pending_dev = pending_ip_devices | selectattr('user_id', 'equalto', log.user.id) | first | default(none) %}
+                            <tr>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:700;flex-shrink:0">
+                                            {{ log.user.full_name[:1] }}
+                                        </div>
+                                        <span style="font-size:13px">{{ log.user.full_name }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if log.user.is_active %}
+                                        <span class="badge bg-success" style="font-size:11px">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary" style="font-size:11px">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark" style="font-size:11px">
+                                        <i class="fas fa-coins me-1 text-warning"></i>{{ log.user.download_credits }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if pending_dev %}
+                                    <div style="font-size:10px;color:#6b7280;margin-bottom:3px;font-family:monospace">
+                                        {{ pending_dev.pending_ip }}
+                                    </div>
+                                    <div style="display:flex;gap:3px">
+                                        <a href="{{ url_for('approve_device', device_id=pending_dev.id) }}"
+                                           class="btn btn-success btn-sm" style="font-size:10px;padding:1px 8px"
+                                           onclick="return confirm('Approve new IP for {{ log.user.full_name }}?')">Approve</a>
+                                        <a href="{{ url_for('block_device', device_id=pending_dev.id) }}"
+                                           class="btn btn-danger btn-sm" style="font-size:10px;padding:1px 8px"
+                                           onclick="return confirm('Block?')">Block</a>
+                                    </div>
+                                    {% else %}
+                                    <span style="font-size:11px;color:#d1d5db">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-3 py-2 text-muted" style="font-size:12px;border-top:1px solid rgba(0,0,0,0.05)">
+                    <i class="fas fa-users me-1"></i> {{ total_agents }} agent{{ 's' if total_agents != 1 else '' }} total
+                </div>
             </div>
         </div>
     </div>
@@ -69,55 +189,71 @@
     <div class="col-lg-7">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-upload me-2 text-primary"></i>Recent Uploads</span>
-                <a href="{{ url_for('admin_upload') }}" class="btn btn-sm btn-primary">
-                    <i class="fas fa-plus"></i> New
-                </a>
+                <span><i class="fas fa-download me-2" style="color:#6366f1"></i> Download Activity <small class="text-muted ms-1">(last 10)</small></span>
+                <a href="{{ url_for('admin_mys_downloads') }}" class="btn btn-sm btn-outline-secondary">View All</a>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table mb-0">
-                        <thead>
-                            <tr>
-                                <th>Filename</th>
-                                <th>Date</th>
-                                <th>Rows</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for upload in recent_uploads %}
-                            <tr>
-                                <td>
-                                    <span style="font-size:12px;color:#64748b">
-                                        <i class="fas fa-file-excel me-1 text-success"></i>
-                                        {{ upload.filename | truncate(30) }}
-                                    </span>
-                                </td>
-                                <td style="font-size:12px;color:#94a3b8">{{ upload.upload_date.strftime('%d %b %Y') }}</td>
-                                <td><span class="badge bg-light text-dark">{{ upload.row_count }}</span></td>
-                                <td>
-                                    <span class="badge {% if upload.status == 'processed' %}bg-success{% elif upload.status == 'synced' %}bg-info{% else %}bg-warning text-dark{% endif %}">
-                                        {{ upload.status }}
-                                    </span>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                {% if recent_mys_downloads %}
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Agent</th>
+                            <th>Source</th>
+                            <th>Type</th>
+                            <th>Term</th>
+                            <th class="text-end">Records</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dl in recent_mys_downloads %}
+                        <tr>
+                            <td><small style="font-weight:600">{{ dl.user.full_name }}</small></td>
+                            <td>
+                                {% if dl.source == 'jpph' %}
+                                <span style="font-size:10px;background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:8px">JPPH</span>
+                                {% else %}
+                                <span style="font-size:10px;background:#ede9fe;color:#5b21b6;padding:1px 6px;border-radius:8px">MYS</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if dl.download_type == 'bulk' %}
+                                <span style="font-size:10px;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:8px">Bulk</span>
+                                {% else %}
+                                <span style="font-size:10px;background:#f3f4f6;color:#374151;padding:1px 6px;border-radius:8px">Single</span>
+                                {% endif %}
+                            </td>
+                            <td><small class="text-muted">{{ dl.search_term[:18] }}</small></td>
+                            <td class="text-end">
+                                <small {% if dl.record_count >= 100 %}style="color:#dc2626;font-weight:600"{% endif %}>{{ dl.record_count }}</small>
+                            </td>
+                            <td><small class="text-muted">{{ dl.timestamp.strftime('%d %b %H:%M') }}</small></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="d-flex align-items-center justify-content-center" style="min-height:180px">
+                    <span class="text-muted" style="font-size:13px">No downloads yet.</span>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
 
     <div class="col-lg-5">
         <div class="card h-100">
-            <div class="card-header">
-                <i class="fas fa-history me-2 text-purple" style="color:#6366f1"></i>Recent Logins
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-history me-2" style="color:#6366f1"></i>Recent Logins</span>
+                <div class="btn-group btn-group-sm" role="group" id="loginLimitBtns">
+                    <button type="button" class="btn btn-outline-secondary active" onclick="setLoginLimit(10, this)">10</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="setLoginLimit(20, this)">20</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="setLoginLimit(30, this)">30</button>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table mb-0">
+                    <table class="table mb-0" id="recentLoginsTable">
                         <thead>
                             <tr>
                                 <th>Agent</th>
@@ -151,4 +287,80 @@
         </div>
     </div>
 </div>
+
+</div>
+
+{% if pending_dup_uploads %}
+<!-- PENDING DUPLICATES PANEL -->
+<div class="row g-3 mt-1" id="pendingDuplicates">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header d-flex justify-content-between align-items-center" style="background:#fff8e1;border-bottom:1px solid #ffd54f">
+                <span style="font-weight:600;color:#b45309">
+                    <i class="fas fa-exclamation-triangle me-2 text-warning"></i>
+                    Pending Duplicate Reviews — {{ pending_dup_uploads|length }} upload(s) need attention
+                </span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead class="table-warning">
+                            <tr>
+                                <th>Upload File</th>
+                                <th>Upload Date</th>
+                                <th>Duplicates</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for upload, dup_count in pending_dup_uploads %}
+                            <tr>
+                                <td>
+                                    <i class="fas fa-file-excel me-1 text-success"></i>
+                                    <span style="font-size:13px">{{ upload.filename | truncate(40) }}</span>
+                                </td>
+                                <td style="font-size:12px;color:#64748b">{{ upload.upload_date.strftime('%d %b %Y %H:%M') }}</td>
+                                <td>
+                                    <span class="badge bg-danger">{{ dup_count }} pending</span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('resolve_duplicates', upload_id=upload.id) }}"
+                                       class="btn btn-sm btn-warning">
+                                        <i class="fas fa-tasks me-1"></i> Review & Resolve
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterTeam() {
+        var q = document.getElementById('teamSearch').value.toLowerCase();
+        document.querySelectorAll('#teamTableBody tr').forEach(function(row) {
+            var name = row.querySelector('td span') ? row.querySelector('td span').textContent.toLowerCase() : '';
+            row.style.display = name.includes(q) ? '' : 'none';
+        });
+    }
+
+    function setLoginLimit(n, btn) {
+        var rows = document.querySelectorAll('#recentLoginsTable tbody tr');
+        rows.forEach(function(row, i) {
+            row.style.display = i < n ? '' : 'none';
+        });
+        document.querySelectorAll('#loginLimitBtns .btn').forEach(function(b) {
+            b.classList.remove('active');
+        });
+        btn.classList.add('active');
+    }
+    setLoginLimit(10, document.querySelector('#loginLimitBtns .btn'));
+</script>
 {% endblock %}

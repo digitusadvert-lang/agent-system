@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block page_title %}Device Pending Approval{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height:60vh">
+    <div class="card text-center" style="max-width:480px;width:100%">
+        <div class="card-body p-5">
+
+            {% if device_status == 'blocked' %}
+            <div style="font-size:64px;margin-bottom:16px">🚫</div>
+            <h4 class="text-danger mb-2">Device Blocked</h4>
+            <p class="text-muted">This device has been blocked by the administrator.<br>Please contact your admin for assistance.</p>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-danger mt-3">Logout</a>
+
+            {% else %}
+            <div id="pendingView">
+                <div style="font-size:64px;margin-bottom:16px">⏳</div>
+                <h4 class="mb-2">Waiting for Admin Approval</h4>
+                <p class="text-muted mb-4">
+                    Your device has been registered and is pending admin approval.<br>
+                    The admin has been notified via Telegram.
+                </p>
+                <div class="spinner-border text-primary mb-3" role="status"></div>
+                <div class="text-muted small">Checking approval status…</div>
+                <div class="mt-4">
+                    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Cancel &amp; Logout</a>
+                </div>
+            </div>
+
+            <div id="approvedView" class="d-none">
+                <div style="font-size:64px;margin-bottom:16px">✅</div>
+                <h4 class="text-success mb-2">Device Approved!</h4>
+                <p class="text-muted">Redirecting you to the dashboard…</p>
+            </div>
+
+            <div id="blockedView" class="d-none">
+                <div style="font-size:64px;margin-bottom:16px">🚫</div>
+                <h4 class="text-danger mb-2">Device Blocked</h4>
+                <p class="text-muted">The admin has blocked this device. Please contact your administrator.</p>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger mt-3">Logout</a>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if device_status != 'blocked' %}
+<script>
+(function poll() {
+    setTimeout(function () {
+        $.getJSON('{{ url_for("agent_device_confirm_status") }}', function (data) {
+            if (data.status === 'approved') {
+                $('#pendingView').addClass('d-none');
+                $('#approvedView').removeClass('d-none');
+                setTimeout(function () {
+                    window.location.href = '{{ url_for("agent_dashboard") }}';
+                }, 1500);
+            } else if (data.status === 'blocked') {
+                $('#pendingView').addClass('d-none');
+                $('#blockedView').removeClass('d-none');
+            } else if (data.status === 'no_pending' || data.status === 'not_found') {
+                window.location.href = '{{ url_for("agent_dashboard") }}';
+            } else {
+                poll();
+            }
+        }).fail(function () { poll(); });
+    }, 4000);
+})();
+</script>
+{% endif %}
+{% endblock %}

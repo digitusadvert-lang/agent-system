@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block page_title %}Processing File...{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card shadow-sm text-center p-4">
+            <div id="spinner" class="mb-3">
+                <div class="spinner-border text-primary" style="width:3rem;height:3rem" role="status"></div>
+            </div>
+            <div id="done-icon" class="mb-3" style="display:none;font-size:3rem">✅</div>
+            <div id="error-icon" class="mb-3" style="display:none;font-size:3rem">❌</div>
+
+            <h4 id="status-title">Processing File</h4>
+            <p id="status-msg" class="text-muted">Please wait — reading and importing records...</p>
+
+            <div class="progress mt-3 mb-2" style="height:8px">
+                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                     style="width:100%"></div>
+            </div>
+            <small class="text-muted">Do not close this tab. Large files may take a few minutes.</small>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var jobId = "{{ job_id }}";
+var pollInterval;
+
+function poll() {
+    fetch('/admin/upload-progress/' + jobId + '/status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('status-msg').textContent = data.message || 'Processing...';
+
+            if (data.status === 'done') {
+                clearInterval(pollInterval);
+                var result = data.result || {};
+
+                if (result.needs_review) {
+                    document.getElementById('status-title').textContent = 'Duplicates Found';
+                    document.getElementById('status-msg').textContent =
+                        result.duplicate_count + ' duplicate records need review.';
+                    document.getElementById('spinner').style.display = 'none';
+                    document.getElementById('done-icon').style.display = 'block';
+                    document.getElementById('progress-bar').className = 'progress-bar bg-warning';
+                    setTimeout(function() {
+                        window.location.href = '/admin/duplicates/' + result.upload_id;
+                    }, 1500);
+
+                } else if (result.success) {
+                    document.getElementById('status-title').textContent = 'Upload Complete!';
+                    document.getElementById('status-msg').textContent = result.message || 'Done.';
+                    document.getElementById('spinner').style.display = 'none';
+                    document.getElementById('done-icon').style.display = 'block';
+                    document.getElementById('progress-bar').className = 'progress-bar bg-success';
+                    setTimeout(function() {
+                        window.location.href = '/admin/dashboard';
+                    }, 2000);
+
+                } else {
+                    document.getElementById('status-title').textContent = 'Error';
+                    document.getElementById('status-msg').textContent = result.error || 'Unknown error.';
+                    document.getElementById('spinner').style.display = 'none';
+                    document.getElementById('error-icon').style.display = 'block';
+                    document.getElementById('progress-bar').className = 'progress-bar bg-danger';
+                    document.getElementById('progress-bar').style.width = '100%';
+                }
+
+            } else if (data.status === 'error') {
+                clearInterval(pollInterval);
+                document.getElementById('status-title').textContent = 'Error';
+                document.getElementById('status-msg').textContent = data.message;
+                document.getElementById('spinner').style.display = 'none';
+                document.getElementById('error-icon').style.display = 'block';
+                document.getElementById('progress-bar').className = 'progress-bar bg-danger';
+            }
+        })
+        .catch(function() {
+            document.getElementById('status-msg').textContent = 'Checking status...';
+        });
+}
+
+pollInterval = setInterval(poll, 2000);
+poll();
+</script>
+{% endblock %}

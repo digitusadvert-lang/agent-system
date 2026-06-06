@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block page_title %}Director{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Director</h2>
+    <p style="color:#6c757d;font-size:13px">Business directors &amp; company contacts database</p>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label">Search By</label>
+                <select class="form-select" id="searchType">
+                    <option value="name">Name</option>
+                    <option value="phone">Phone Number</option>
+                    <option value="address">Address / Company</option>
+                </select>
+            </div>
+            <div class="col-md-7">
+                <label class="form-label">Search Term</label>
+                <input type="text" class="form-control" id="searchTerm"
+                       placeholder="e.g. Daniel, 0123456789, Petaling Jaya...">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" id="searchBtn" onclick="doSearch()">
+                    Search
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="resultsArea" style="display:none">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0" id="resultsTitle">Director Results</h5>
+            <div class="d-flex align-items-center gap-2">
+                <span id="resultsBadge"></span>
+                <button class="btn btn-sm btn-outline-success" id="downloadBtn" onclick="downloadAll()" style="display:none">
+                    <i class="fas fa-download"></i> Download CSV
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div id="loadingSpinner" style="display:none;text-align:center;padding:30px">
+                <div class="spinner-border text-primary"></div>
+            </div>
+            <div style="overflow-x:auto">
+                <table id="directorTable" class="table table-sm table-hover mb-0" style="width:100%;font-size:13px">
+                    <thead style="background:#1e2b3a;color:white">
+                        <tr>
+                            <th style="width:40px">#</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Company</th>
+                            <th>Designation</th>
+                            <th>Address</th>
+                            <th>Email</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var allResults = [];
+var fp = (function(){
+    var KEY = 'wtp_device_id', id = null;
+    try { id = localStorage.getItem(KEY); } catch(e) {}
+    if (!id) {
+        id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+        try { localStorage.setItem(KEY, id); } catch(e) {}
+    }
+    document.cookie = 'fp=' + id + '; path=/; SameSite=Strict; max-age=31536000';
+    return id;
+})();
+
+function escCsv(v){ v=(v==null?'':String(v)).replace(/"/g,'""'); return '"'+v+'"'; }
+
+function downloadAll() {
+    if (!allResults.length) return;
+    var headers = ['Name','Phone','Company','Designation','Address','Email'];
+    var rows = allResults.map(function(r){
+        var add = r.additional_data || {};
+        return [r.name, r.contact_number, add.company||'', add.designation||'', r.address, r.email].map(escCsv).join(',');
+    });
+    var csv = '﻿' + [headers.join(',')].concat(rows).join('\r\n');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    a.download = 'Director_' + $('#searchTerm').val().replace(/\s+/g,'_') + '.csv';
+    a.click();
+}
+
+function doSearch() {
+    var term = $('#searchTerm').val().trim();
+    if (!term) { alert('Please enter a search term.'); return; }
+
+    var btn = $('#searchBtn');
+    btn.prop('disabled', true).text('Searching...');
+    $('#loadingSpinner').show();
+    $('#tableBody').empty();
+    $('#resultsArea').show();
+
+    $.post('/agent/director-search', {
+        search_type: $('#searchType').val(),
+        search_term: term,
+        fp: fp
+    }, function(data) {
+        btn.prop('disabled', false).text('Search');
+        $('#loadingSpinner').hide();
+        if (!data.ok) { alert(data.message || 'Search failed.'); $('#resultsArea').hide(); return; }
+
+        allResults = data.results;
+        var tbody = $('#tableBody');
+        tbody.empty();
+
+        if (!data.results.length) {
+            tbody.append('<tr><td colspan="7" class="text-center text-muted py-4">No results found.</td></tr>');
+        } else {
+            data.results.forEach(function(r, i) {
+                var add = r.additional_data || {};
+                tbody.append('<tr>' +
+                    '<td><small class="text-muted">' + (i+1) + '</small></td>' +
+                    '<td><strong>' + (r.name||'—') + '</strong>' + (add.title ? ' <small class="text-muted">'+add.title+'</small>' : '') + '</td>' +
+                    '<td><small style="font-family:monospace">' + (r.contact_number||'—') + '</small></td>' +
+                    '<td><small>' + (add.company||'—') + '</small></td>' +
+                    '<td><small class="text-muted">' + (add.designation||'—') + '</small></td>' +
+                    '<td><small style="display:block;max-width:200px;word-break:break-word">' + (r.address||'—') + '</small></td>' +
+                    '<td><small>' + (r.email||'—') + '</small></td>' +
+                '</tr>');
+            });
+        }
+
+        var badge = data.truncated
+            ? '<span class="badge bg-warning text-dark">First ' + data.results.length + '</span>'
+            : '<span class="badge bg-success">' + data.results.length + ' found</span>';
+        $('#resultsTitle').text('Director Results — ' + data.results.length + ' record(s)');
+        $('#resultsBadge').html(badge);
+        $('#downloadBtn').show();
+    }).fail(function() {
+        btn.prop('disabled', false).text('Search');
+        $('#loadingSpinner').hide();
+        alert('Server error. Please try again.');
+    });
+}
+
+$('#searchTerm').on('keypress', function(e){ if(e.which===13) doSearch(); });
+</script>
+<script>
+(function(){var p=new URLSearchParams(window.location.search),q=p.get('q'),t=p.get('type');if(q){$(document).ready(function(){$('#searchTerm').val(q);if(t)$('#searchType').val(t);doSearch();});}})();
+</script>
+{% endblock %}

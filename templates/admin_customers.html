@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+{% block page_title %}All Customers{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h2>All Customers</h2>
+        <p>Browse and filter the full customer database</p>
+    </div>
+    <div class="text-muted" style="font-size:13px">
+        <i class="fas fa-database me-1"></i>
+        {{ pagination.total | default(0) }} total record(s)
+    </div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="card mb-3">
+    <div class="card-body py-3">
+        <form method="GET" action="{{ url_for('admin_customers') }}" id="filterForm">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size:12px;font-weight:600">Name</label>
+                    <input type="text" class="form-control form-control-sm" name="name"
+                           value="{{ name_filter }}" placeholder="Search name...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size:12px;font-weight:600">Phone</label>
+                    <input type="text" class="form-control form-control-sm" name="phone"
+                           value="{{ phone_filter }}" placeholder="Search phone...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size:12px;font-weight:600">IC Number</label>
+                    <input type="text" class="form-control form-control-sm" name="ic"
+                           value="{{ ic_filter }}" placeholder="Search IC...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size:12px;font-weight:600">Email</label>
+                    <input type="text" class="form-control form-control-sm" name="email"
+                           value="{{ email_filter }}" placeholder="Search email...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label mb-1" style="font-size:12px;font-weight:600">Source / Property</label>
+                    <select class="form-select form-select-sm" name="source">
+                        <option value="">All Sources</option>
+                        {% for src in sources %}
+                        <option value="{{ src }}" {% if source_filter == src %}selected{% endif %}>{{ src }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                        <i class="fas fa-filter me-1"></i> Filter
+                    </button>
+                    <a href="{{ url_for('admin_customers') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </div>
+            <input type="hidden" name="per_page" value="{{ per_page }}">
+        </form>
+    </div>
+</div>
+
+<!-- RESULTS TABLE -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center py-2">
+        <span style="font-size:14px;font-weight:600">
+            {% if name_filter or phone_filter or ic_filter or source_filter or email_filter %}
+                <i class="fas fa-filter me-1 text-primary"></i> Filtered Results — {{ pagination.total }} record(s)
+            {% else %}
+                <i class="fas fa-list me-1"></i> All Records — {{ pagination.total }} total
+            {% endif %}
+        </span>
+        <div class="d-flex align-items-center gap-2">
+            <span style="font-size:12px;color:#94a3b8">Rows per page:</span>
+            <div class="btn-group btn-group-sm">
+                {% for n in [25, 50, 100, 200] %}
+                <a href="{{ url_for('admin_customers', per_page=n, name=name_filter, phone=phone_filter, ic=ic_filter, source=source_filter, email=email_filter) }}"
+                   class="btn {% if per_page == n %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ n }}</a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {% if customers %}
+    <div class="table-responsive">
+        <table class="table table-hover mb-0" style="font-size:13px">
+            <thead style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+                <tr>
+                    <th style="width:50px;color:#64748b;font-weight:600">#</th>
+                    <th style="color:#64748b;font-weight:600">Name</th>
+                    <th style="color:#64748b;font-weight:600">Phone</th>
+                    <th style="color:#64748b;font-weight:600">IC Number</th>
+                    <th style="color:#64748b;font-weight:600">Email</th>
+                    <th style="color:#64748b;font-weight:600">Address</th>
+                    <th style="color:#64748b;font-weight:600">Source</th>
+                    <th style="color:#64748b;font-weight:600">Added</th>
+                    <th style="color:#64748b;font-weight:600;width:110px">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% set row_offset = (pagination.page - 1) * per_page %}
+                {% for customer in customers %}
+                <tr>
+                    <td class="text-muted">{{ row_offset + loop.index }}</td>
+                    <td>
+                        <span style="font-weight:500">{{ customer.name or '-' }}</span>
+                    </td>
+                    <td>{{ customer.contact_number or '-' }}</td>
+                    <td>{{ customer.ic_number or '-' }}</td>
+                    <td>
+                        {% if customer.email %}
+                            <span style="font-size:12px">{{ customer.email }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if customer.address %}
+                            <span style="color:#64748b;font-size:12px" title="{{ customer.address }}">
+                                {{ customer.address[:50] }}{% if customer.address|length > 50 %}…{% endif %}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if customer.data_source %}
+                            <span class="badge" style="background:#e0e7ff;color:#4338ca;font-weight:500;font-size:11px">
+                                {{ customer.data_source[:30] }}{% if customer.data_source|length > 30 %}…{% endif %}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td style="color:#94a3b8;font-size:12px;white-space:nowrap">
+                        {% if customer.created_at %}
+                            {{ customer.created_at.strftime('%d %b %Y') }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline-info view-detail-btn"
+                                    data-customer-id="{{ customer.id }}" title="View full details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="{{ url_for('admin_customer_enrichment', customer_id=customer.id) }}"
+                               title="Enrich">
+                                <i class="fas fa-globe"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- PAGINATION -->
+    {% if pagination.pages > 1 %}
+    <div class="card-footer d-flex justify-content-between align-items-center py-2">
+        <span style="font-size:13px;color:#64748b">
+            Showing {{ row_offset + 1 }}–{{ row_offset + customers|length }} of {{ pagination.total }}
+        </span>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link"
+                       href="{{ url_for('admin_customers', page=pagination.prev_num, per_page=per_page, name=name_filter, phone=phone_filter, ic=ic_filter, source=source_filter, email=email_filter) }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+
+                {% set start_page = [pagination.page - 2, 1] | max %}
+                {% set end_page = [start_page + 4, pagination.pages] | min %}
+                {% set start_page = [end_page - 4, 1] | max %}
+
+                {% if start_page > 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin_customers', page=1, per_page=per_page, name=name_filter, phone=phone_filter, ic=ic_filter, source=source_filter, email=email_filter) }}">1</a>
+                </li>
+                {% if start_page > 2 %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+                {% endif %}
+
+                {% for p in range(start_page, end_page + 1) %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link"
+                       href="{{ url_for('admin_customers', page=p, per_page=per_page, name=name_filter, phone=phone_filter, ic=ic_filter, source=source_filter, email=email_filter) }}">
+                        {{ p }}
+                    </a>
+                </li>
+                {% endfor %}
+
+                {% if end_page < pagination.pages %}
+                {% if end_page < pagination.pages - 1 %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin_customers', page=pagination.pages, per_page=per_page, name=name_filter, phone=phone_filter, ic=ic_filter, source=source_filter, email=email_filter) }}">{{ pagination.pages }}</a>
+                </li>
+                {% endif %}
+
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link"
+                       href="{{ url_for('admin_customers', page=pagination.next_num, per_page=per_page, name=name_filter, phone=phone_filter, ic=ic_filter, source=source_filter, email=email_filter) }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="card-body text-center py-5">
+        <i class="fas fa-users fa-3x mb-3" style="color:#cbd5e1"></i>
+        <p class="text-muted mb-0">No customers found{% if name_filter or phone_filter or ic_filter or source_filter or email_filter %} matching your filters{% endif %}.</p>
+        {% if name_filter or phone_filter or ic_filter or source_filter or email_filter %}
+        <a href="{{ url_for('admin_customers') }}" class="btn btn-sm btn-outline-secondary mt-2">Clear Filters</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- CUSTOMER DETAIL MODAL (reused from search page) -->
+<div class="modal fade" id="customerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user me-2"></i> Customer Full Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="customerModalBody">
+                <div class="text-center"><div class="spinner-border"></div></div>
+            </div>
+            <div class="modal-footer">
+                <div class="me-auto small text-muted" id="customerDeleteStatus"></div>
+                <button type="button" class="btn btn-outline-danger" id="requestDeleteBtn" data-customer-id="" disabled>
+                    <i class="fas fa-trash-alt"></i> Request Delete
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function () {
+    var customerModal = new bootstrap.Modal(document.getElementById('customerModal'));
+    var deleteBtn = $('#requestDeleteBtn');
+    var deleteStatus = $('#customerDeleteStatus');
+
+    function resetDeleteControls() {
+        deleteBtn.data('customer-id', '');
+        deleteBtn.prop('disabled', true).html('<i class="fas fa-trash-alt"></i> Request Delete');
+        deleteStatus.removeClass('text-danger text-success').addClass('text-muted').text('Open a record to request boss approval for delete.');
+    }
+
+    resetDeleteControls();
+
+    $(document).on('click', '.view-detail-btn', function () {
+        var customerId = $(this).data('customer-id');
+        resetDeleteControls();
+        $('#customerModalBody').html('<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>');
+        customerModal.show();
+
+        $.getJSON('/customer/' + customerId + '/detail', function (data) {
+            var html = '<table class="table table-bordered table-sm">';
+            var renderList = function (items, emptyText) {
+                if (!items || items.length === 0) return '<span class="text-muted">' + (emptyText || '-') + '</span>';
+                return '<ul class="mb-0 ps-3">' + items.map(function (item) { return '<li>' + item + '</li>'; }).join('') + '</ul>';
+            };
+
+            [['Name', data.name], ['Contact Number', data.contact_number], ['IC Number', data.ic_number],
+             ['Address', data.address], ['Email', data.email]].forEach(function (row) {
+                html += '<tr><th style="width:35%;background:#f8f9fa">' + row[0] + '</th><td>' + (row[1] || '-') + '</td></tr>';
+            });
+
+            if (data.additional && Object.keys(data.additional).length > 0) {
+                html += '<tr><td colspan="2" class="table-secondary fw-bold">Additional Information</td></tr>';
+                Object.entries(data.additional).forEach(function ([key, value]) {
+                    html += '<tr><th style="width:35%;background:#f8f9fa">' + key + '</th><td>' + (value || '-') + '</td></tr>';
+                });
+            }
+
+            if (data.identity_summary) {
+                html += '<tr><td colspan="2" class="table-secondary fw-bold">Merged Identity Profile</td></tr>';
+                html += '<tr><th style="background:#f8f9fa">Normalized IC</th><td>' + (data.identity_summary.ic_norm || '-') + '</td></tr>';
+                html += '<tr><th style="background:#f8f9fa">IC Variants</th><td>' + renderList(data.identity_summary.ic_aliases, 'None') + '</td></tr>';
+                html += '<tr><th style="background:#f8f9fa">All Names</th><td>' + renderList(data.identity_summary.names, 'None') + '</td></tr>';
+                html += '<tr><th style="background:#f8f9fa">All Phones</th><td>' + renderList(data.identity_summary.phones, 'None') + '</td></tr>';
+                html += '<tr><th style="background:#f8f9fa">All Emails</th><td>' + renderList(data.identity_summary.emails, 'None') + '</td></tr>';
+                html += '<tr><th style="background:#f8f9fa">All Addresses</th><td>' + renderList(data.identity_summary.addresses, 'None') + '</td></tr>';
+                html += '<tr><th style="background:#f8f9fa">Merge History</th><td>' + ((data.identity_summary.merge_history_count || 0) + ' merge event(s)') + '</td></tr>';
+            }
+
+            if (data.enrichments && data.enrichments.length > 0) {
+                html += '<tr><td colspan="2" class="table-secondary fw-bold">Saved Enrichment</td></tr>';
+                data.enrichments.forEach(function (item, idx) {
+                    var summary = [item.platform || 'Public Web', item.matched_company || '', item.matched_title || '', item.matched_location || ''].filter(Boolean).join(' | ');
+                    var link = item.source_url ? ('<a href="' + item.source_url + '" target="_blank">' + item.source_url + '</a>') : '-';
+                    html += '<tr><th style="background:#f8f9fa">Finding ' + (idx + 1) + '</th><td>' + summary + '<br><small>' + link + '</small></td></tr>';
+                });
+            }
+
+            html += '</table>';
+            $('#customerModalBody').html(html);
+
+            deleteBtn.data('customer-id', data.id);
+            if (data.pending_delete_approval) {
+                deleteBtn.prop('disabled', true).html('<i class="fas fa-clock"></i> Delete Pending');
+                deleteStatus.removeClass('text-muted text-danger').addClass('text-success').text('Delete request already sent and waiting for approval.');
+            } else {
+                deleteBtn.prop('disabled', false).html('<i class="fas fa-trash-alt"></i> Request Delete');
+                deleteStatus.removeClass('text-danger text-success').addClass('text-muted').text('Deleting requires boss approval.');
+            }
+        }).fail(function () {
+            $('#customerModalBody').html('<div class="alert alert-danger mb-0">Could not load customer details.</div>');
+        });
+    });
+
+    deleteBtn.on('click', function () {
+        var customerId = $(this).data('customer-id');
+        if (!customerId || $(this).prop('disabled')) return;
+        if (!window.confirm('Send this delete request to boss for approval?')) return;
+
+        deleteBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Sending...');
+        $.ajax({
+            url: '/admin/customer/' + customerId + '/request-delete',
+            method: 'POST',
+            success: function (response) {
+                deleteBtn.html('<i class="fas fa-clock"></i> Delete Pending');
+                deleteStatus.addClass('text-success').text(response.message || 'Delete request sent.');
+            },
+            error: function (xhr) {
+                var response = xhr.responseJSON || {};
+                deleteBtn.prop('disabled', false).html('<i class="fas fa-trash-alt"></i> Request Delete');
+                deleteStatus.addClass('text-danger').text(response.message || 'Could not send delete request.');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

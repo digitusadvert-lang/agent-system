@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block page_title %}MYS Download Logs{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h2>MYS Download Logs</h2>
+        <p>All MYS data downloads by agents</p>
+    </div>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary btn-sm">Back to Dashboard</a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-sm table-striped mb-0" id="dlTable">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Agent</th>
+                    <th>Type</th>
+                    <th>Search By</th>
+                    <th>Search Term</th>
+                    <th class="text-end">Records</th>
+                    <th>IP</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dl in logs %}
+                <tr>
+                    <td><small>{{ loop.index }}</small></td>
+                    <td>
+                        <small style="font-weight:600">{{ dl.user.full_name }}</small>
+                        <small class="text-muted d-block">{{ dl.user.username }}</small>
+                    </td>
+                    <td>
+                        {% if dl.download_type == 'bulk' %}
+                        <span style="font-size:11px;background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;font-weight:600">Bulk</span>
+                        {% else %}
+                        <span style="font-size:11px;background:#f3f4f6;color:#374151;padding:2px 8px;border-radius:10px">Single</span>
+                        {% endif %}
+                    </td>
+                    <td><small class="text-muted">{{ dl.search_type }}</small></td>
+                    <td><small>{{ dl.search_term }}</small></td>
+                    <td class="text-end">
+                        <small {% if dl.record_count >= 100 %}style="color:#dc2626;font-weight:700"
+                               {% elif dl.record_count >= 50 %}style="color:#d97706;font-weight:600"
+                               {% endif %}>{{ dl.record_count }}</small>
+                    </td>
+                    <td><small class="text-muted" style="font-family:monospace">{{ dl.ip_address }}</small></td>
+                    <td><small>{{ dl.timestamp.strftime('%d %b %Y %H:%M') }}</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    $('#dlTable').DataTable({
+        order: [[7, 'desc']],
+        pageLength: 50,
+        lengthMenu: [25, 50, 100]
+    });
+});
+</script>
+{% endblock %}

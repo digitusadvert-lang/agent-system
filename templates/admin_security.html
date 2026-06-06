@@ -21,6 +21,7 @@
 </div>
 {% endif %}
 
+
 <div class="row g-3">
 
     <!-- PASSWORD EXPIRY POLICY -->
@@ -63,6 +64,78 @@
 
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="fas fa-save me-2"></i> Save Policy
+                    </button>
+                </form>
+
+                <hr class="my-4">
+
+                <form method="POST">
+                    <input type="hidden" name="action" value="session_timeout">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Agent Session Timeout</label>
+                        <p class="text-muted mb-3" style="font-size:13px">
+                            How long before an idle agent is automatically logged out.
+                        </p>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            {% for mins, label in [('15','15 min'),('30','30 min'),('60','1 hour'),('120','2 hours'),('240','4 hours'),('480','8 hours')] %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="session_timeout_minutes"
+                                       id="st_{{ mins }}" value="{{ mins }}"
+                                       {% if current_session_timeout == mins %}checked{% endif %}>
+                                <label class="form-check-label" for="st_{{ mins }}">{{ label }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="alert alert-info mb-3" style="font-size:13px">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Current setting: <strong>
+                            {% set t = current_session_timeout | int %}
+                            {% if t < 60 %}{{ t }} minutes
+                            {% elif t == 60 %}1 hour
+                            {% else %}{{ (t / 60) | int }} hours{% endif %}
+                        </strong> of inactivity
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save me-2"></i> Save Timeout
+                    </button>
+                </form>
+
+                <hr class="my-4">
+
+                <form method="POST">
+                    <input type="hidden" name="action" value="pw_reset_limit">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Telegram Password Reset Limit</label>
+                        <p class="text-muted mb-3" style="font-size:13px">
+                            Max number of self-resets an agent can request via Telegram within the window period.
+                        </p>
+                        <div class="row g-2 align-items-center mb-3">
+                            <div class="col-auto">
+                                <label class="form-label mb-0" style="font-size:13px">Max resets</label>
+                            </div>
+                            <div class="col-auto">
+                                <input type="number" class="form-control form-control-sm" name="pw_reset_max"
+                                       value="{{ pw_reset_max }}" min="1" max="10" style="width:70px">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label mb-0" style="font-size:13px">times per</label>
+                            </div>
+                            <div class="col-auto">
+                                <input type="number" class="form-control form-control-sm" name="pw_reset_window_days"
+                                       value="{{ pw_reset_window_days }}" min="1" max="30" style="width:70px">
+                            </div>
+                            <div class="col-auto">
+                                <label class="form-label mb-0" style="font-size:13px">days</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mb-3" style="font-size:13px">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Current: <strong>{{ pw_reset_max }} reset(s)</strong> per <strong>{{ pw_reset_window_days }} days</strong> — window starts on first reset
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save me-2"></i> Save Reset Limit
                     </button>
                 </form>
             </div>
@@ -165,8 +238,18 @@
                             <input class="form-check-input" type="checkbox" id="tg_enabled"
                                    name="telegram_enabled" {% if telegram_enabled == '1' %}checked{% endif %}>
                             <label class="form-check-label fw-bold" for="tg_enabled">
-                                Enable Telegram Approval
+                                Enable Telegram Approval (Admin login)
                             </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="agent_ip_approval_enabled"
+                                   name="agent_ip_approval_enabled" {% if agent_ip_approval_enabled %}checked{% endif %}>
+                            <label class="form-check-label fw-bold" for="agent_ip_approval_enabled">
+                                Block Agent Login from New IP (require admin approval)
+                            </label>
+                            <div class="form-text">When enabled, agents logging in from a different IP address will be blocked until admin approves via Telegram or the devices page.</div>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -184,6 +267,16 @@
                         <div class="form-text">Send a message to your bot then visit:
                             <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Bot Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text">@</span>
+                            <input type="text" class="form-control" name="telegram_bot_username"
+                                   value="{{ telegram_bot_username }}"
+                                   placeholder="YourBotName_bot">
+                        </div>
+                        <div class="form-text">Agents see this on their Settings page to know which bot to message.</div>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="fab fa-telegram me-2"></i> Save Telegram Settings
@@ -220,6 +313,268 @@
     </div>
 </div>
 
+<!-- ADMIN ACCOUNTS -->
+<div class="row g-3 mt-1">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-user-shield me-2 text-danger"></i> Admin Accounts</span>
+                <span class="badge bg-secondary">{{ admin_users|length }} admin(s)</span>
+            </div>
+            <div class="card-body p-0">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Full Name</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Created</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in admin_users %}
+                        <tr>
+                            <td style="font-size:13px;font-weight:600">
+                                {{ u.full_name or '—' }}
+                                {% if u.id == current_user.id %}
+                                <span class="badge bg-primary ms-1" style="font-size:10px">You</span>
+                                {% endif %}
+                            </td>
+                            <td style="font-size:13px"><code>{{ u.username }}</code></td>
+                            <td style="font-size:12px;color:#64748b">{{ u.email }}</td>
+                            <td style="font-size:12px;color:#94a3b8">{{ u.created_at.strftime('%d %b %Y') if u.created_at else '—' }}</td>
+                            <td>
+                                {% if u.id != current_user.id %}
+                                <form method="POST" action="{{ url_for('delete_admin_account', user_id=u.id) }}"
+                                      onsubmit="return confirm('Delete admin account {{ u.username }}? This cannot be undone.')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="text-muted small">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="fas fa-user-plus me-2 text-success"></i> Create New Admin
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3" style="font-size:13px">
+                    New admin accounts have full system access. Only create accounts for trusted staff.
+                </p>
+                <form method="POST">
+                    <input type="hidden" name="action" value="create_admin">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="font-size:13px">Full Name</label>
+                        <input type="text" class="form-control form-control-sm" name="new_full_name"
+                               placeholder="e.g. Sarah Lee" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="font-size:13px">Username</label>
+                        <input type="text" class="form-control form-control-sm" name="new_username"
+                               placeholder="e.g. sarah_admin" required autocomplete="off">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="font-size:13px">Email</label>
+                        <input type="email" class="form-control form-control-sm" name="new_email"
+                               placeholder="sarah@company.com" required autocomplete="off">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" style="font-size:13px">Password</label>
+                        <div class="input-group input-group-sm">
+                            <input type="password" class="form-control" name="new_password"
+                                   id="newAdminPwd" placeholder="Min. 8 characters" required autocomplete="new-password">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    onclick="togglePwd()">
+                                <i class="fas fa-eye" id="pwdIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-user-plus me-2"></i> Create Admin Account
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PANIC MODE STATUS: intentionally hidden from page when active -->
+
+<!-- DATA PROTECTION TOGGLE -->
+<div class="row g-3 mt-1">
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <span><i class="fas fa-user-secret me-2 text-danger"></i> Agent Data Protection</span>
+                {% if dp_enabled %}
+                <span class="badge bg-danger">ENABLED</span>
+                {% else %}
+                <span class="badge bg-secondary">DISABLED</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3" style="font-size:13.5px">
+                    When enabled, agents see masked versions of customer records on screen
+                    <strong>and</strong> in downloaded Excel files. Admins always see full data.
+                </p>
+                <div class="alert {% if dp_enabled %}alert-warning{% else %}alert-info{% endif %} mb-3" style="font-size:13px">
+                    {% if dp_enabled %}
+                    <i class="fas fa-lock me-1"></i>
+                    <strong>Protection is ON.</strong> Agent views and downloads are masked.
+                    {% else %}
+                    <i class="fas fa-lock-open me-1"></i>
+                    <strong>Protection is OFF.</strong> Agents see full customer data.
+                    {% endif %}
+                </div>
+                <form method="POST" action="{{ url_for('toggle_data_protection') }}"
+                      onsubmit="return confirm('{% if dp_enabled %}Disable data protection? Agents will see full data.{% else %}Enable data protection? Agent views will be masked.{% endif %}')">
+                    <button type="submit" class="btn w-100 {% if dp_enabled %}btn-outline-secondary{% else %}btn-danger{% endif %}">
+                        <i class="fas {% if dp_enabled %}fa-lock-open{% else %}fa-lock{% endif %} me-2"></i>
+                        {% if dp_enabled %}Disable Protection{% else %}Enable Protection{% endif %}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <i class="fas fa-eye-slash me-2 text-muted"></i> Masking Preview (what agents see when enabled)
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0" style="font-size:13px">
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th>Original</th>
+                            <th>Masked</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="text-muted">Name</td>
+                            <td>John Smith</td>
+                            <td><code>J*** S****</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Phone</td>
+                            <td>012-3456789</td>
+                            <td><code>XXXXXX789</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Email</td>
+                            <td>john@example.com</td>
+                            <td><code>j***@example.com</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">IC Number</td>
+                            <td>850101-14-5678</td>
+                            <td><code>XXXXXX-XX-5678</code></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Address</td>
+                            <td>123 Jalan Ampang</td>
+                            <td><code>[Address hidden — 17 chars]</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PANIC MODE CARD: only shown when panic is OFF so attacker never sees it -->
+{% if not panic_enabled %}
+<div class="row g-3 mt-1">
+    <div class="col-12">
+        <div class="card" style="border:1px solid {% if panic_enabled %}rgba(220,38,38,0.5){% else %}rgba(100,116,139,0.3){% endif %}">
+            <div class="card-header d-flex align-items-center justify-content-between"
+                 style="background:{% if panic_enabled %}rgba(220,38,38,0.1){% else %}rgba(100,116,139,0.05){% endif %}">
+                <span>
+                    <i class="fas fa-radiation me-2 {% if panic_enabled %}text-danger{% else %}text-muted{% endif %}"></i>
+                    <span class="fw-700" style="color:{% if panic_enabled %}#dc2626{% else %}#475569{% endif %}">
+                        Panic Mode — Decoy Database
+                    </span>
+                </span>
+                {% if panic_enabled %}
+                <span class="badge bg-danger">ACTIVE</span>
+                {% else %}
+                <span class="badge bg-secondary">STANDBY</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <p class="mb-2" style="font-size:13.5px;color:#374151">
+                            When activated, <strong>all customer searches return realistic-looking fake records</strong>.
+                            The real database is never touched. Agents and admins downloading data receive decoy Excel files.
+                        </p>
+                        <p class="mb-2 text-muted" style="font-size:12.5px">
+                            Trigger from your phone — bookmark both links below and tap when needed.
+                            The links work without logging in. Keep them private.
+                        </p>
+                        {% if panic_token %}
+                        <div class="d-flex flex-column gap-2" style="font-size:12.5px">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="badge bg-danger" style="min-width:40px">ON</span>
+                                <input id="panicOnUrl" type="text" readonly
+                                       value="https://w3rm.net/x/{{ panic_token }}/on"
+                                       style="flex:1;min-width:0;font-size:11.5px;font-family:monospace;
+                                              border:1px solid #d1d5db;border-radius:4px;padding:3px 6px;
+                                              background:#f9fafb;cursor:pointer"
+                                       onclick="this.select()"
+                                       title="Click to select, then copy">
+                                <button class="btn btn-sm btn-outline-secondary py-0"
+                                        onclick="copyPanicUrl('panicOnUrl', this)">Copy</button>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="badge bg-success" style="min-width:40px">OFF</span>
+                                <input id="panicOffUrl" type="text" readonly
+                                       value="https://w3rm.net/x/{{ panic_token }}/off"
+                                       style="flex:1;min-width:0;font-size:11.5px;font-family:monospace;
+                                              border:1px solid #d1d5db;border-radius:4px;padding:3px 6px;
+                                              background:#f9fafb;cursor:pointer"
+                                       onclick="this.select()"
+                                       title="Click to select, then copy">
+                                <button class="btn btn-sm btn-outline-secondary py-0"
+                                        onclick="copyPanicUrl('panicOffUrl', this)">Copy</button>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-lg-4 text-end">
+                        {% if panic_enabled %}
+                        <div class="alert alert-danger py-2 mb-0 text-center" style="font-size:13px">
+                            <i class="fas fa-radiation me-1"></i> <strong>Serving decoy data</strong><br>
+                            <small>Send /unpanic to Telegram bot to restore</small>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-secondary py-2 mb-0 text-center" style="font-size:13px">
+                            <i class="fas fa-shield-alt me-1"></i> <strong>Normal — real data served</strong><br>
+                            <small>Send /panic to Telegram bot to activate</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- PHASE 2 TOGGLE -->
 <div class="row g-3 mt-1">
     <div class="col-12">
@@ -231,7 +586,7 @@
             </div>
             <div class="card-body">
                 <p class="text-muted mb-3" style="font-size:13.5px">
-                    Enable this to show the Phase 2 section in the sidebar. Phase 2 features are currently in development.
+                    Enable this to show the Phase 2 section in the sidebar. Phase 2 now includes premium-packaging space for enrichment, identity resolution, and household intelligence features.
                 </p>
                 <form method="POST">
                     <input type="hidden" name="action" value="phase2_toggle">
@@ -258,5 +613,39 @@
     $(document).ready(function () {
         $('#adminDevTable').DataTable({ pageLength: 10, order: [[3, 'desc']] });
     });
+    function copyPanicUrl(inputId, btn) {
+        var text = document.getElementById(inputId).value;
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:0;left:0;width:2px;height:2px;opacity:0;border:none;outline:none';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch(e) {}
+        document.body.removeChild(ta);
+        if (ok) {
+            var orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            btn.classList.replace('btn-outline-secondary', 'btn-success');
+            setTimeout(function() {
+                btn.textContent = orig;
+                btn.classList.replace('btn-success', 'btn-outline-secondary');
+            }, 2000);
+        } else {
+            document.getElementById(inputId).select();
+        }
+    }
+    function togglePwd() {
+        var f = document.getElementById('newAdminPwd');
+        var ico = document.getElementById('pwdIcon');
+        if (f.type === 'password') {
+            f.type = 'text';
+            ico.classList.replace('fa-eye', 'fa-eye-slash');
+        } else {
+            f.type = 'password';
+            ico.classList.replace('fa-eye-slash', 'fa-eye');
+        }
+    }
 </script>
 {% endblock %}

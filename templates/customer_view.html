@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block page_title %}Customer #{{ customer.id }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <div>
+    <h2><i class="fas fa-user-circle me-2 text-primary"></i>{{ customer.name or 'Unknown Customer' }}</h2>
+    <p>Customer ID #{{ customer.id }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button onclick="window.close()" class="btn btn-secondary btn-sm">
+      <i class="fas fa-times me-1"></i> Close Tab
+    </button>
+    {% if current_user.role == 'admin' %}
+    <a href="{{ url_for('admin_customer_enrichment', customer_id=customer.id) }}" class="btn btn-outline-primary btn-sm">
+      <i class="fas fa-globe me-1"></i> Enrichment
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+
+  <!-- Core info -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-id-card me-2 text-primary"></i>Core Information</div>
+      <div class="card-body p-0">
+        <table class="table table-bordered mb-0" style="font-size:13.5px;">
+          <tbody>
+            <tr><th style="width:38%;background:#f8fafc;padding:11px 16px;">Full Name</th>
+                <td style="padding:11px 16px;">{{ customer.name or '—' }}</td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">Contact Number</th>
+                <td style="padding:11px 16px;">{{ customer.contact_number or '—' }}</td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">IC Number</th>
+                <td style="padding:11px 16px;">{{ customer.ic_number or '—' }}</td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">Email</th>
+                <td style="padding:11px 16px;">{{ customer.email or '—' }}</td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">Address</th>
+                <td style="padding:11px 16px;white-space:pre-wrap;">{{ customer.address or '—' }}</td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">Data Source</th>
+                <td style="padding:11px 16px;"><span class="badge bg-secondary">{{ customer.data_source or '—' }}</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Identity profile -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-fingerprint me-2 text-purple" style="color:#6366f1"></i>Merged Identity Profile</div>
+      <div class="card-body p-0">
+        <table class="table table-bordered mb-0" style="font-size:13.5px;">
+          <tbody>
+            <tr><th style="width:38%;background:#f8fafc;padding:11px 16px;">Normalized IC</th>
+                <td style="padding:11px 16px;font-family:monospace;">{{ identity_summary.ic_norm or '—' }}</td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">IC Variants</th>
+                <td style="padding:11px 16px;">
+                  {% if identity_summary.ic_aliases %}
+                    <ul class="mb-0 ps-3">{% for v in identity_summary.ic_aliases %}<li>{{ v }}</li>{% endfor %}</ul>
+                  {% else %}—{% endif %}
+                </td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">All Names</th>
+                <td style="padding:11px 16px;">
+                  {% if identity_summary.names %}
+                    <ul class="mb-0 ps-3">{% for v in identity_summary.names %}<li>{{ v }}</li>{% endfor %}</ul>
+                  {% else %}—{% endif %}
+                </td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">All Phones</th>
+                <td style="padding:11px 16px;">
+                  {% if identity_summary.phones %}
+                    <ul class="mb-0 ps-3">{% for v in identity_summary.phones %}<li>{{ v }}</li>{% endfor %}</ul>
+                  {% else %}—{% endif %}
+                </td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">All Emails</th>
+                <td style="padding:11px 16px;">
+                  {% if identity_summary.emails %}
+                    <ul class="mb-0 ps-3">{% for v in identity_summary.emails %}<li>{{ v }}</li>{% endfor %}</ul>
+                  {% else %}—{% endif %}
+                </td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">All Addresses</th>
+                <td style="padding:11px 16px;">
+                  {% if identity_summary.addresses %}
+                    <ul class="mb-0 ps-3">{% for v in identity_summary.addresses %}<li>{{ v }}</li>{% endfor %}</ul>
+                  {% else %}—{% endif %}
+                </td></tr>
+            <tr><th style="background:#f8fafc;padding:11px 16px;">Merge History</th>
+                <td style="padding:11px 16px;">{{ identity_summary.merge_history_count or 0 }} merge event(s)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Additional fields -->
+  {% if additional %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-table me-2 text-success"></i>Additional Information</div>
+      <div class="card-body p-0">
+        <table class="table table-bordered mb-0" style="font-size:13.5px;">
+          <tbody>
+            {% for key, value in additional.items() %}
+            <tr>
+              <th style="width:25%;background:#f8fafc;padding:10px 16px;">{{ key }}</th>
+              <td style="padding:10px 16px;">{{ value or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Enrichments (admin only) -->
+  {% if enrichments %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-globe me-2 text-info"></i>Public Enrichment Records</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-bordered mb-0" style="font-size:13px;">
+            <thead class="table-light">
+              <tr>
+                <th>Platform</th><th>Company</th><th>Title</th>
+                <th>Location</th><th>Confidence</th><th>Status</th><th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in enrichments %}
+              <tr>
+                <td>{{ e.platform or '—' }}</td>
+                <td>{{ e.matched_company or '—' }}</td>
+                <td>{{ e.matched_title or '—' }}</td>
+                <td>{{ e.matched_location or '—' }}</td>
+                <td>
+                  <span class="badge {% if e.confidence_score >= 70 %}bg-success{% elif e.confidence_score >= 40 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                    {{ e.confidence_score }}%
+                  </span>
+                </td>
+                <td><span class="badge bg-secondary">{{ e.review_status }}</span></td>
+                <td>
+                  {% if e.source_url %}
+                  <a href="{{ e.source_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" style="font-size:11px;">
+                    <i class="fas fa-external-link-alt"></i>
+                  </a>
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

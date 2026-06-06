@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block page_title %}Transacted Data{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Transacted Data</h2>
+    <p>Search Malaysia property transaction records (JPPH database)</p>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label">Search By</label>
+                <select class="form-select" id="searchType">
+                    <option value="keyword">Keyword (All Fields)</option>
+                    <option value="address">Address</option>
+                    <option value="scheme">Scheme / Project Name</option>
+                    <option value="mukim">Mukim</option>
+                    <option value="daerah">Daerah</option>
+                    <option value="vendor">Vendor</option>
+                    <option value="purchaser">Purchaser</option>
+                </select>
+            </div>
+            <div class="col-md-7">
+                <label class="form-label">Search Term</label>
+                <input type="text" class="form-control" id="searchTerm"
+                       placeholder="e.g. Puchong, Sri Petaling, KLCC, Ooi Ah Kow...">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" id="searchBtn" onclick="doSearch()">
+                    <i class="fas fa-search"></i> Search
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="resultsArea" style="display:none">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0" id="resultsTitle">Transacted Data Results</h5>
+            <div class="d-flex align-items-center gap-2">
+                <span id="resultsBadge"></span>
+                <button class="btn btn-sm btn-outline-success" id="downloadBtn" onclick="downloadAll()" style="display:none">
+                    <i class="fas fa-download"></i> Download CSV
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0 table-sm" id="resultsTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Date</th>
+                            <th>Address</th>
+                            <th>Scheme</th>
+                            <th>Type</th>
+                            <th>Price (RM)</th>
+                            <th>Land Area (sf)</th>
+                            <th>BU Area (sf)</th>
+                            <th>BU PSF (RM)</th>
+                            <th>Bedroom</th>
+                            <th>Mukim</th>
+                            <th>Daerah</th>
+                            <th>Lot No</th>
+                            <th>Tenure</th>
+                            <th>Vendor</th>
+                            <th>Purchaser</th>
+                            <th>Details</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Transaction Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var dt = null;
+var detailModal = null;
+var allResults = [];
+
+function fmt(v)      { return (v && v !== '0' && v !== '0.0') ? v : '-'; }
+function fmtDate(v)  { return (v && v.length >= 10) ? v.substring(0, 10) : (v || '-'); }
+function fmtPrice(v) {
+    if (!v) return '-';
+    var n = parseFloat(v.toString().replace(/,/g, ''));
+    return isNaN(n) ? (v || '-') : n.toLocaleString('en-MY', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+function calcPsf(price, sf) {
+    var p = parseFloat((price || '').toString().replace(/,/g, ''));
+    var s = parseFloat((sf   || '').toString().replace(/,/g, ''));
+    if (isNaN(p) || isNaN(s) || s <= 0) return '-';
+    return (p / s).toLocaleString('en-MY', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+function s(v) { return '<small>' + (v || '-') + '</small>'; }
+
+function showDetail(r) {
+    var fields = [
+        ['Transaction ID',     r.row_id],
+        ['Date',               fmtDate(r.date_val)],
+        ['Transacted Price',   'RM ' + fmtPrice(r.transacted_price)],
+        ['Address',            r.address],
+        ['Scheme',             r.scheme],
+        ['Type',               r.prop_type],
+        ['Tenure',             r.tenure],
+        ['Bedroom',            r.bedroom],
+        ['Floor Above',        r.floor_above],
+        ['Floor Below',        r.floor_below],
+        ['Land Area (sf)',     r.land_area_sf],
+        ['Land Area PSF (RM)', r.land_area_psf],
+        ['BU Area (sf)',       r.bu_area_sf],
+        ['BU Area (sm)',       r.bu_area_sm],
+        ['BU Area PSF (RM)',   r.bu_area_psf],
+        ['Lot No',             r.lot_no],
+        ['Section',            r.section],
+        ['Mukim',              r.mukim_town],
+        ['Daerah',             r.district],
+        ['Area',               r.area],
+        ['Unit',               r.unit],
+        ['Category',           r.category],
+        ['Lot Status',         r.lot_status],
+        ['Lot Type',           r.lot_type],
+        ['Title Type',         r.title_type],
+        ['Title No',           r.title_no],
+        ['Ref',                r.ref_no],
+        ['Share',              r.share],
+        ['LH Expired Date',    r.lh_expired_date],
+        ['Plan',               r.plan],
+        ['RSS',                r.rss],
+        ['Item ID',            r.item_id],
+        ['Vendor',             r.vendor],
+        ['Purchaser',          r.purchaser]
+    ];
+    var html = '<table class="table table-bordered table-sm">';
+    fields.forEach(function(f) {
+        html += '<tr><th style="width:40%;background:#f8f9fa">' + f[0] + '</th><td>' + fmt(f[1]) + '</td></tr>';
+    });
+    html += '</table>';
+    $('#detailModalBody').html(html);
+    detailModal.show();
+}
+
+function escCsv(v) { v = (v == null ? '' : String(v)).replace(/"/g,'""'); return '"'+v+'"'; }
+
+function buildJpphCsv(rows) {
+    var headers = ['Date','Address','Scheme','Type','Price (RM)','Land Area (sf)','BU Area (sf)','BU PSF (RM)','Bedroom','Mukim','Daerah','Lot No','Tenure','Vendor','Purchaser'];
+    var lines = rows.map(function(r) {
+        var psf = '';
+        var p = parseFloat((r.transacted_price||'').toString().replace(/,/g,''));
+        var sf = parseFloat((r.bu_area_sf||'').toString().replace(/,/g,''));
+        if (!isNaN(p) && !isNaN(sf) && sf > 0) psf = (p/sf).toFixed(2);
+        return [r.date_val, r.address, r.scheme, r.prop_type, r.transacted_price,
+                r.land_area_sf, r.bu_area_sf, psf, r.bedroom,
+                r.mukim_town, r.district, r.lot_no, r.tenure, r.vendor, r.purchaser]
+            .map(escCsv).join(',');
+    });
+    return '﻿' + [headers.join(',')].concat(lines).join('\r\n');
+}
+
+function triggerCsv(content, filename) {
+    var blob = new Blob([content], {type:'text/csv;charset=utf-8;'});
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+}
+
+function downloadAll() {
+    if (!allResults.length) return;
+    triggerCsv(buildJpphCsv(allResults), 'JPPH_'+$('#searchType').val()+'_'+$('#searchTerm').val().replace(/\s+/g,'_')+'.csv');
+}
+
+function downloadRow(r) {
+    triggerCsv(buildJpphCsv([r]), 'JPPH_'+(r.row_id||'record')+'.csv');
+}
+
+function doSearch() {
+    var term = $('#searchTerm').val().trim();
+    if (!term) { alert('Please enter a search term.'); return; }
+
+    var btn = $('#searchBtn');
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Searching...');
+
+    $.post('/admin/transacted-data/search', {
+        search_type: $('#searchType').val(),
+        term: term
+    }, function(data) {
+        btn.prop('disabled', false).html('<i class="fas fa-search"></i> Search');
+        if (!data.meta.ok) { alert(data.meta.message || 'Search failed.'); return; }
+
+        allResults = data.results;
+        dt.clear();
+        dt.rows.add(data.results);
+        dt.draw();
+
+        var badge = data.meta.truncated
+            ? '<span class="badge bg-warning text-dark">First ' + data.meta.limit + '</span>'
+            : '<span class="badge bg-success">All Results</span>';
+        $('#resultsTitle').text('Transacted Data — ' + data.results.length + ' record(s)');
+        $('#resultsBadge').html(badge);
+        $('#downloadBtn').show();
+        $('#resultsArea').show();
+    }).fail(function() {
+        btn.prop('disabled', false).html('<i class="fas fa-search"></i> Search');
+        alert('Server error. Please try again.');
+    });
+}
+
+$(document).ready(function() {
+    detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+
+    // Initialize DataTable ONCE with empty data — update via dt.clear().rows.add().draw()
+    dt = $('#resultsTable').DataTable({
+        data: [],
+        columns: [
+            { data: null,              orderable: false,  render: function(d,t,r,m){ return m.row+1; } },
+            { data: 'date_val',        render: function(v){ return s(fmtDate(v)); } },
+            { data: 'address',         render: function(v){ return '<small style="max-width:180px;display:inline-block;word-break:break-word">'+(v||'-')+'</small>'; } },
+            { data: 'scheme',          render: function(v){ return s(v); } },
+            { data: 'prop_type',       render: function(v){ return s(v); } },
+            { data: 'transacted_price', className: 'text-end', render: function(v){ return s(fmtPrice(v)); } },
+            { data: 'land_area_sf',    className: 'text-end', render: function(v){ return s(fmt(v)); } },
+            { data: 'bu_area_sf',      className: 'text-end', render: function(v){ return s(fmt(v)); } },
+            { data: null,              className: 'text-end', render: function(d,t,r){ return s(calcPsf(r.transacted_price, r.bu_area_sf)); } },
+            { data: 'bedroom',         className: 'text-center', render: function(v){ return s(fmt(v)); } },
+            { data: 'mukim_town',      render: function(v){ return s(v); } },
+            { data: 'district',        render: function(v){ return s(v); } },
+            { data: 'lot_no',          render: function(v){ return s(v); } },
+            { data: 'tenure',          render: function(v){ return s(fmt(v)); } },
+            { data: 'vendor',          render: function(v){ return '<small style="max-width:140px;display:inline-block;word-break:break-word">'+(v||'-')+'</small>'; } },
+            { data: 'purchaser',       render: function(v){ return '<small style="max-width:140px;display:inline-block;word-break:break-word">'+(v||'-')+'</small>'; } },
+            { data: null, orderable: false, defaultContent: '<button class="view-btn" style="font-size:11px;padding:2px 8px;cursor:pointer;border:1px solid #adb5bd;border-radius:4px;background:#fff">View</button>' },
+            { data: null, orderable: false, render: function(){ return '<button class="dl-row-btn" title="Download" style="background:none;border:1px solid #d1d5db;border-radius:4px;padding:2px 6px;cursor:pointer;color:#6b7280"><i class="fas fa-download" style="font-size:10px"></i></button>'; } }
+        ],
+        pageLength: 50,
+        lengthMenu: [25, 50, 100, 250],
+        order: [[1, 'desc']],
+        language: { emptyTable: 'Enter a search term above to find transactions.' }
+    });
+
+    $('#resultsTable').on('click', '.view-btn', function() {
+        var r = dt.row($(this).closest('tr')).data();
+        if (r) showDetail(r);
+    });
+    $('#resultsTable').on('click', '.dl-row-btn', function() {
+        var r = dt.row($(this).closest('tr')).data();
+        if (r) downloadRow(r);
+    });
+
+    $('#searchTerm').on('keypress', function(e) {
+        if (e.which === 13) doSearch();
+    });
+});
+</script>
+<script>
+(function(){var p=new URLSearchParams(window.location.search),q=p.get('q'),t=p.get('type');if(q){$(document).ready(function(){$('#searchTerm').val(q);if(t)$('#searchType').val(t);doSearch();});}})();
+</script>
+{% endblock %}

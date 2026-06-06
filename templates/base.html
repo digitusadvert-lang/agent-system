@@ -105,6 +105,21 @@
             color: #a5b4fc;
         }
         .sidebar-nav .nav-link.active { color: #818cf8; }
+        .nav-dropdown-toggle {
+            color: #8892b0; border-radius: 8px; padding: 10px 12px; margin-bottom: 2px;
+            font-size: 13.5px; font-weight: 500; display: flex; align-items: center; gap: 10px;
+            cursor: pointer; user-select: none; transition: all 0.2s;
+        }
+        .nav-dropdown-toggle:hover, .nav-dropdown-toggle.open {
+            background: rgba(99,102,241,0.15); color: #a5b4fc;
+        }
+        .nav-dropdown-toggle .chevron {
+            margin-left: auto; font-size: 11px; transition: transform 0.2s;
+        }
+        .nav-dropdown-toggle.open .chevron { transform: rotate(180deg); }
+        .nav-dropdown-menu { display: none; padding-left: 12px; }
+        .nav-dropdown-menu.open { display: block; }
+        .nav-dropdown-menu .nav-link { font-size: 13px; padding: 8px 12px; }
 
         .sidebar-footer {
             padding: 12px;
@@ -251,7 +266,7 @@
             border-bottom: 2px solid #e8ecf0; padding: 11px 14px;
             white-space: nowrap;
         }
-        .table tbody td { padding: 11px 14px; color: #374151; vertical-align: middle; border-color: #f1f5f9; }
+        .table tbody td { padding: 11px 14px; color: #0f172a; vertical-align: middle; border-color: #f1f5f9; }
         .table tbody tr:hover { background: #f8faff; }
         /* Always allow horizontal scroll on tables */
         .table-responsive { -webkit-overflow-scrolling: touch; }
@@ -368,58 +383,135 @@
 
     <div class="sidebar-nav">
         {% if current_user.role == 'admin' %}
-        <div class="nav-section-label">Main</div>
-        <a class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}"
-           href="{{ url_for('admin_dashboard') }}">
-            <i class="fas fa-th-large"></i> Dashboard
-        </a>
-        <a class="nav-link {% if request.endpoint == 'admin_search' %}active{% endif %}"
-           href="{{ url_for('admin_search') }}">
-            <i class="fas fa-search"></i> Search Data
-        </a>
 
-        <div class="nav-section-label mt-2">Data</div>
-        <a class="nav-link {% if request.endpoint == 'admin_upload' %}active{% endif %}"
-           href="{{ url_for('admin_upload') }}">
-            <i class="fas fa-upload"></i> Upload File
-        </a>
-        <a class="nav-link {% if request.endpoint == 'admin_sync' %}active{% endif %}"
-           href="{{ url_for('admin_sync') }}">
-            <i class="fas fa-sync-alt"></i> Sync Data
-        </a>
+        {% set main_active = request.endpoint in ('admin_dashboard','admin_search','admin_customers','admin_customer_map','admin_transacted_data') %}
+        <div class="nav-dropdown-toggle {% if main_active %}open{% endif %}" onclick="toggleNavDropdown(this)">
+            <i class="fas fa-th-large" style="width:18px;text-align:center;font-size:14px"></i>
+            Main
+            <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="nav-dropdown-menu {% if main_active %}open{% endif %}">
+            <a class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}"
+               href="{{ url_for('admin_dashboard') }}">
+                <i class="fas fa-th-large"></i> Dashboard
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_search' %}active{% endif %}"
+               href="{{ url_for('admin_search') }}">
+                <i class="fas fa-search"></i> Search Data
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_transacted_data' %}active{% endif %}"
+               href="{{ url_for('admin_transacted_data') }}">
+                <i class="fas fa-file-alt"></i> Transacted Data
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_mys' %}active{% endif %}"
+               href="{{ url_for('admin_mys') }}">
+                <i class="fas fa-database"></i> MYS
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_director' %}active{% endif %}"
+               href="{{ url_for('admin_director') }}">
+                <i class="fas fa-user-tie"></i> Director
+            </a>
+            <span class="nav-link" style="opacity:0.45;cursor:default;pointer-events:none">
+                <i class="fas fa-address-book"></i> All Customers <small style="font-size:10px;background:#4b5563;color:#d1d5db;padding:1px 6px;border-radius:8px;vertical-align:middle">Coming Soon</small>
+            </span>
+            <a class="nav-link {% if request.endpoint == 'admin_customer_map' %}active{% endif %}"
+               href="{{ url_for('admin_customer_map') }}">
+                <i class="fas fa-map-marked-alt"></i> Customer Map
+            </a>
+        </div>
 
-        <div class="nav-section-label mt-2">Security</div>
-        <a class="nav-link {% if request.endpoint == 'admin_security' %}active{% endif %}"
-           href="{{ url_for('admin_security') }}">
-            <i class="fas fa-shield-alt"></i> Security
-        </a>
-        <a class="nav-link {% if request.endpoint == 'admin_devices' %}active{% endif %}"
-           href="{{ url_for('admin_devices') }}">
-            <i class="fas fa-laptop"></i> Agent Devices
-            {% if pending_devices_count > 0 %}
-            <span class="badge bg-warning text-dark ms-auto">{{ pending_devices_count }}</span>
-            {% endif %}
-        </a>
+        {% if not panic_enabled %}
+        {% set security_active = request.endpoint in ('admin_security','admin_devices') %}
+        <div class="nav-dropdown-toggle mt-1 {% if security_active %}open{% endif %}" onclick="toggleNavDropdown(this)">
+            <i class="fas fa-shield-alt" style="width:18px;text-align:center;font-size:14px"></i>
+            Security
+            <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="nav-dropdown-menu {% if security_active %}open{% endif %}">
+            <a class="nav-link {% if request.endpoint == 'admin_security' %}active{% endif %}"
+               href="{{ url_for('admin_security') }}">
+                <i class="fas fa-shield-alt"></i> Security
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_devices' %}active{% endif %}"
+               href="{{ url_for('admin_devices') }}">
+                <i class="fas fa-laptop"></i> Agent Devices
+                {% if pending_devices_count > 0 %}
+                <span class="badge bg-warning text-dark ms-auto">{{ pending_devices_count }}</span>
+                {% endif %}
+            </a>
+        </div>
 
-        <div class="nav-section-label mt-2">Management</div>
-        <a class="nav-link {% if request.endpoint == 'admin_agents' %}active{% endif %}"
-           href="{{ url_for('admin_agents') }}">
-            <i class="fas fa-users"></i> Agents
-        </a>
-        <a class="nav-link {% if request.endpoint == 'admin_logs' %}active{% endif %}"
-           href="{{ url_for('admin_logs') }}">
-            <i class="fas fa-history"></i> Logs
+        {% set mgmt_active = request.endpoint in ('admin_agents','admin_logs','admin_change_password') %}
+        <div class="nav-dropdown-toggle mt-1 {% if mgmt_active %}open{% endif %}" onclick="toggleNavDropdown(this)">
+            <i class="fas fa-cog" style="width:18px;text-align:center;font-size:14px"></i>
+            Management
+            <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="nav-dropdown-menu {% if mgmt_active %}open{% endif %}">
+            <a class="nav-link {% if request.endpoint == 'admin_agents' %}active{% endif %}"
+               href="{{ url_for('admin_agents') }}">
+                <i class="fas fa-users"></i> Agents
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_logs' %}active{% endif %}"
+               href="{{ url_for('admin_logs') }}">
+                <i class="fas fa-history"></i> Logs
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_change_password' %}active{% endif %}"
+               href="{{ url_for('admin_change_password') }}">
+                <i class="fas fa-key"></i> Change Password
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_work_log' %}active{% endif %}"
+               href="{{ url_for('admin_work_log') }}">
+                <i class="fas fa-file-invoice"></i> Work Log
+            </a>
+        </div>
+        {% endif %}
+
+        {% set data_active = request.endpoint in ('admin_upload','admin_sync','admin_excel_tools','admin_db_scan','admin_db_scan_progress','admin_db_scan_report','admin_db_scan_resolve') %}
+        <div class="nav-dropdown-toggle mt-1 {% if data_active %}open{% endif %}" onclick="toggleNavDropdown(this)">
+            <i class="fas fa-database" style="width:18px;text-align:center;font-size:14px"></i>
+            Data
+            <i class="fas fa-chevron-down chevron"></i>
+        </div>
+        <div class="nav-dropdown-menu {% if data_active %}open{% endif %}">
+            <a class="nav-link {% if request.endpoint == 'admin_upload' %}active{% endif %}"
+               href="{{ url_for('admin_upload') }}">
+                <i class="fas fa-upload"></i> Upload File
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_sync' %}active{% endif %}"
+               href="{{ url_for('admin_sync') }}">
+                <i class="fas fa-sync-alt"></i> Sync Data
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin_excel_tools' %}active{% endif %}"
+               href="{{ url_for('admin_excel_tools') }}">
+                <i class="fas fa-table"></i> Excel Tool
+            </a>
+            <a class="nav-link {% if request.endpoint in ('admin_db_scan','admin_db_scan_progress','admin_db_scan_report','admin_db_scan_resolve') %}active{% endif %}"
+               href="{{ url_for('admin_db_scan') }}">
+                <i class="fas fa-clone"></i> DB Dup Scan
+            </a>
+        </div>
+
+        <a class="nav-link mt-1" href="{{ url_for('logout') }}" style="color:#f87171">
+            <i class="fas fa-sign-out-alt"></i> Logout
         </a>
 
         {% if phase2_enabled %}
-        <div class="nav-section-label mt-2">Phase 2</div>
-        <a class="nav-link {% if request.endpoint == 'phase2_overview' %}active{% endif %}"
-           href="{{ url_for('phase2_overview') }}"
-           style="background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(139,92,246,0.12));border:1px solid rgba(99,102,241,0.2)">
-            <i class="fas fa-rocket" style="color:#a78bfa"></i>
+        {% set phase2_active = request.endpoint == 'phase2_overview' %}
+        <div class="nav-dropdown-toggle mt-1 {% if phase2_active %}open{% endif %}" onclick="toggleNavDropdown(this)"
+             style="background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(139,92,246,0.12));border:1px solid rgba(99,102,241,0.2)">
+            <i class="fas fa-rocket" style="width:18px;text-align:center;font-size:14px;color:#a78bfa"></i>
             <span style="color:#c4b5fd">Phase 2</span>
-            <span class="badge ms-auto" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);font-size:9px">NEW</span>
-        </a>
+            <span class="badge ms-auto me-1" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);font-size:9px">NEW</span>
+            <i class="fas fa-chevron-down chevron" style="color:#a78bfa"></i>
+        </div>
+        <div class="nav-dropdown-menu {% if phase2_active %}open{% endif %}">
+            <a class="nav-link {% if phase2_active %}active{% endif %}"
+               href="{{ url_for('phase2_overview') }}">
+                <i class="fas fa-rocket" style="color:#a78bfa"></i>
+                <span style="color:#c4b5fd">Overview</span>
+            </a>
+        </div>
         {% endif %}
 
         {% else %}
@@ -430,15 +522,37 @@
         </a>
         <a class="nav-link {% if request.endpoint == 'agent_search' %}active{% endif %}"
            href="{{ url_for('agent_search') }}">
-            <i class="fas fa-search"></i> Search
+            <i class="fas fa-search"></i> Search Customer
         </a>
+        <a class="nav-link {% if request.endpoint == 'agent_transacted_data' %}active{% endif %}"
+           href="{{ url_for('agent_transacted_data') }}">
+            <i class="fas fa-file-alt"></i> Transacted Data
+        </a>
+        <a class="nav-link {% if request.endpoint == 'agent_mys' %}active{% endif %}"
+           href="{{ url_for('agent_mys') }}">
+            <i class="fas fa-database"></i> MYS
+        </a>
+        <a class="nav-link {% if request.endpoint == 'agent_director' %}active{% endif %}"
+           href="{{ url_for('agent_director') }}">
+            <i class="fas fa-user-tie"></i> Director
+        </a>
+        <a class="nav-link {% if request.endpoint == 'agent_settings' %}active{% endif %}"
+           href="{{ url_for('agent_settings') }}">
+            <i class="fas fa-cog"></i> Settings
+        </a>
+        <div style="margin:16px 8px 4px;padding:10px 12px;border-radius:10px;background:rgba(99,102,241,0.08);border:1px dashed rgba(99,102,241,0.3)">
+            <div style="font-size:10px;color:#7c83a0;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:3px">Coming Soon</div>
+            <div style="font-size:12px;font-weight:600;color:#a78bfa">Phase 2</div>
+        </div>
         {% endif %}
     </div>
 
     <div class="sidebar-footer">
+        {% if current_user.role != 'admin' %}
         <a class="nav-link" href="{{ url_for('logout') }}">
             <i class="fas fa-sign-out-alt"></i> Logout
         </a>
+        {% endif %}
     </div>
 </div>
 
@@ -460,11 +574,6 @@
                 <span class="d-none d-sm-inline">{{ current_user.full_name }}</span>
                 <span class="d-sm-none">{{ current_user.full_name.split()[0] }}</span>
             </span>
-            {% if current_user.role == 'agent' %}
-            <span class="topbar-badge" title="Download credits">
-                <i class="fas fa-coins me-1 text-warning"></i>{{ current_user.credit_balance }}
-            </span>
-            {% endif %}
         </div>
     </div>
 
@@ -494,7 +603,11 @@
     </a>
     <a class="mnav-item {% if request.endpoint == 'agent_search' %}active{% endif %}"
        href="{{ url_for('agent_search') }}">
-        <i class="fas fa-search"></i>Search
+        <i class="fas fa-search"></i>Search Customer
+    </a>
+    <a class="mnav-item {% if request.endpoint == 'agent_mys' %}active{% endif %}"
+       href="{{ url_for('agent_mys') }}">
+        <i class="fas fa-database"></i>MYS
     </a>
     <a class="mnav-item" href="{{ url_for('logout') }}">
         <i class="fas fa-sign-out-alt"></i>Logout
@@ -552,6 +665,12 @@
             if (window.innerWidth < 768) closeSidebar();
         });
     });
+
+    function toggleNavDropdown(el) {
+        el.classList.toggle('open');
+        var menu = el.nextElementSibling;
+        if (menu) menu.classList.toggle('open');
+    }
 </script>
 
 {% block scripts %}{% endblock %}

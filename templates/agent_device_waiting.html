@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block page_title %}Device Confirmation{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height:60vh">
+    <div class="card text-center" style="max-width:480px;width:100%">
+        <div class="card-body p-5">
+            <div id="waitingView">
+                <div style="font-size:64px;margin-bottom:16px">📱</div>
+                <h4 class="mb-2">Check Your Telegram</h4>
+                <p class="text-muted mb-3">
+                    A confirmation request has been sent to your Telegram.<br>
+                    Tap <strong>Allow — it's me</strong> to approve access.
+                </p>
+                {% if bot_username %}
+                <div class="alert alert-light border mb-3 text-start" style="font-size:0.92rem">
+                    <strong>Steps:</strong><br>
+                    1. Open Telegram<br>
+                    2. Find <strong>@{{ bot_username }}</strong><br>
+                    3. Tap the <strong>Allow</strong> button in the message
+                </div>
+                {% endif %}
+                <div class="spinner-border text-primary mb-3" role="status"></div>
+                <div class="text-muted small mb-3">Waiting for your confirmation…</div>
+                <div class="mb-3">
+                    <button id="resendBtn" class="btn btn-sm btn-outline-primary" onclick="resendTelegram()">Resend Message</button>
+                    <div id="resendMsg" class="small mt-2 d-none"></div>
+                </div>
+                <div>
+                    <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-secondary">Cancel &amp; Logout</a>
+                </div>
+            </div>
+
+            <div id="approvedView" class="d-none">
+                <div style="font-size:64px;margin-bottom:16px">✅</div>
+                <h4 class="text-success mb-2">Device Approved!</h4>
+                <p class="text-muted">Redirecting you to the dashboard…</p>
+            </div>
+
+            <div id="deniedView" class="d-none">
+                <div style="font-size:64px;margin-bottom:16px">❌</div>
+                <h4 class="text-danger mb-2">Device Denied</h4>
+                <p class="text-muted">This device has been blocked. Please contact your administrator.</p>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger mt-2">Logout</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function poll() {
+    setTimeout(function () {
+        $.getJSON('{{ url_for("agent_device_confirm_status") }}', function (data) {
+            if (data.status === 'approved') {
+                $('#waitingView').addClass('d-none');
+                $('#approvedView').removeClass('d-none');
+                setTimeout(function () {
+                    window.location.href = '{{ url_for("agent_dashboard") }}';
+                }, 1500);
+            } else if (data.status === 'blocked') {
+                $('#waitingView').addClass('d-none');
+                $('#deniedView').removeClass('d-none');
+            } else if (data.status === 'no_pending' || data.status === 'not_found') {
+                window.location.href = '{{ url_for("agent_dashboard") }}';
+            } else {
+                poll();
+            }
+        }).fail(function () {
+            poll();
+        });
+    }, 3000);
+})();
+
+var resendCooldown = false;
+function resendTelegram() {
+    if (resendCooldown) return;
+    resendCooldown = true;
+    var btn = document.getElementById('resendBtn');
+    var msg = document.getElementById('resendMsg');
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    msg.className = 'small mt-2 d-none';
+    $.post('{{ url_for("agent_device_resend_telegram") }}', function (data) {
+        if (data.ok) {
+            msg.textContent = 'Message sent. Check your Telegram.';
+            msg.className = 'small mt-2 text-success';
+        } else {
+            msg.textContent = 'Could not send. Please try again.';
+            msg.className = 'small mt-2 text-danger';
+        }
+        msg.classList.remove('d-none');
+    }).fail(function () {
+        msg.textContent = 'Network error. Please try again.';
+        msg.className = 'small mt-2 text-danger';
+        msg.classList.remove('d-none');
+    }).always(function () {
+        btn.textContent = 'Resend Message';
+        setTimeout(function () {
+            btn.disabled = false;
+            resendCooldown = false;
+        }, 30000);
+    });
+}
+</script>
+{% endblock %}

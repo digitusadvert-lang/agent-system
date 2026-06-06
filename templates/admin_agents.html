@@ -6,8 +6,165 @@
     <p>Manage agents, passwords and download credits</p>
 </div>
 
+<!-- AGENTS TABLE -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-users me-2"></i> All Agents</span>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('bulk_upload_agents') }}" class="btn btn-sm btn-success">
+                <i class="fas fa-file-excel me-1"></i> Bulk Upload
+            </a>
+            <a href="{{ url_for('add_agent') }}" class="btn btn-sm btn-primary">
+                <i class="fas fa-plus me-1"></i> Add Agent
+            </a>
+        </div>
+    </div>
+    <div class="card-header d-flex justify-content-between align-items-center" style="border-top:1px solid rgba(0,0,0,.05);background:#f8fafc">
+        <input type="text" id="agentSearch" class="form-control form-control-sm"
+               placeholder="Search by name, username, email or phone..."
+               style="max-width:380px">
+    </div>
+    <div class="table-responsive">
+        <table class="table mb-0" id="agentsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Telegram</th>
+                        <th>Status</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for agent in agents %}
+                    <tr>
+                        <td style="font-size:12px;color:#94a3b8">#{{ agent.id }}</td>
+                        <td style="font-weight:600">{{ agent.username }}</td>
+                        <td>{{ agent.full_name }}</td>
+                        <td style="font-size:13px">{{ agent.email }}</td>
+                        <td style="font-size:13px">{{ agent.phone }}</td>
+                        <td>
+                            {% if agent.telegram_chat_id %}
+                                <span class="badge bg-success" title="Linked: {{ agent.telegram_chat_id }}">
+                                    <i class="fab fa-telegram me-1"></i>Linked
+                                </span>
+                            {% else %}
+                                <button class="btn btn-xs btn-outline-secondary gen-tg-btn"
+                                        data-agent-id="{{ agent.id }}"
+                                        data-agent-name="{{ agent.full_name }}"
+                                        style="font-size:11px;padding:2px 8px"
+                                        title="Generate registration code for agent">
+                                    <i class="fab fa-telegram me-1"></i>Link
+                                </button>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if agent.is_resigned %}
+                                <span class="badge bg-secondary">Resigned</span>
+                                <div style="font-size:10px;color:#94a3b8;margin-top:2px">
+                                    {{ agent.resigned_at.strftime('%d %b %Y') if agent.resigned_at else '' }}
+                                </div>
+                            {% elif agent.is_locked_out() %}
+                                <span class="badge bg-danger">Locked</span>
+                                <div style="font-size:10px;color:#ef4444;margin-top:2px">
+                                    Until {{ agent.locked_until.strftime('%H:%M') }}
+                                </div>
+                            {% elif agent.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                            {% if agent.failed_login_attempts and agent.failed_login_attempts > 0 and not agent.is_locked_out() %}
+                                <div style="font-size:10px;margin-top:3px;color:{% if agent.failed_login_attempts >= 3 %}#f97316{% else %}#eab308{% endif %};font-weight:600">
+                                    {{ agent.failed_login_attempts }}x wrong pw
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td style="font-size:12px;color:#94a3b8">
+                            {{ agent.last_login.strftime('%d %b %Y %H:%M') if agent.last_login else 'Never' }}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('toggle_agent', agent_id=agent.id) }}"
+                               class="btn btn-sm {% if agent.is_active %}btn-warning{% else %}btn-success{% endif %}"
+                               onclick="return confirm('Are you sure?')">
+                                {% if agent.is_active %}
+                                    <i class="fas fa-ban"></i>
+                                {% else %}
+                                    <i class="fas fa-check"></i>
+                                {% endif %}
+                            </a>
+                            <button class="btn btn-sm btn-secondary change-pw-btn"
+                                    data-agent-id="{{ agent.id }}"
+                                    data-agent-name="{{ agent.full_name }}">
+                                <i class="fas fa-key"></i>
+                            </button>
+                            <button class="btn btn-sm btn-info text-white device-max-btn"
+                                    data-agent-id="{{ agent.id }}"
+                                    data-agent-name="{{ agent.full_name }}"
+                                    title="Set device limit">
+                                <i class="fas fa-mobile-alt me-1"></i>
+                                {% if agent.max_devices %}
+                                    Max {{ agent.max_devices }}
+                                {% else %}
+                                    Max {{ global_device_limit }}
+                                {% endif %}
+                            </button>
+                            <button class="btn btn-sm {% if agent.is_resigned %}btn-outline-secondary{% else %}btn-outline-danger{% endif %} resign-btn"
+                                    data-agent-id="{{ agent.id }}"
+                                    data-agent-name="{{ agent.full_name }}"
+                                    data-is-resigned="{{ 'true' if agent.is_resigned else 'false' }}"
+                                    data-resigned-at="{{ agent.resigned_at.strftime('%d %b %Y') if agent.resigned_at else '' }}">
+                                <i class="fas fa-door-open me-1"></i>{{ 'Un-Resign' if agent.is_resigned else 'Resign' }}
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Telegram Link Token Modal -->
+<div class="modal fade" id="tgLinkModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fab fa-telegram me-2 text-primary"></i> Link Telegram</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3" style="font-size:13px">
+                    Agent: <strong id="tgAgentName"></strong>
+                </p>
+                <div id="tgTokenSection" class="d-none">
+                    <p style="font-size:13px">Share this one-time code with the agent. They must send this to your Telegram bot:</p>
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <code id="tgTokenDisplay" style="font-size:20px;letter-spacing:3px;font-weight:700;color:#4338ca"></code>
+                        <button class="btn btn-sm btn-outline-primary" onclick="copyTgToken()"><i class="fas fa-copy"></i></button>
+                    </div>
+                    <div class="alert alert-info p-2" style="font-size:12px">
+                        Agent sends: <code>/register <span id="tgTokenInAlert"></span></code>
+                    </div>
+                    <p class="text-muted" style="font-size:11px">Token is single-use and clears after linking.</p>
+                </div>
+                <div id="tgTokenLoading" class="text-center">
+                    <div class="spinner-border spinner-border-sm"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- CREDIT MANAGEMENT PANEL -->
-<div class="card mb-4" style="border:1px solid rgba(99,102,241,0.2)">
+<div class="card mb-4 mt-4" style="border:1px solid rgba(99,102,241,0.2);display:none">
     <div class="card-header" style="background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.08));border-bottom:1px solid rgba(99,102,241,0.15)">
         <i class="fas fa-coins me-2" style="color:#a78bfa"></i>
         <span style="font-weight:700;color:#4338ca">Download Credit Management</span>
@@ -81,90 +238,6 @@
     </div>
 </div>
 
-<!-- AGENTS TABLE -->
-<div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fas fa-users me-2"></i> All Agents</span>
-        <div class="d-flex gap-2">
-            <a href="{{ url_for('bulk_upload_agents') }}" class="btn btn-sm btn-success">
-                <i class="fas fa-file-excel me-1"></i> Bulk Upload
-            </a>
-            <a href="{{ url_for('add_agent') }}" class="btn btn-sm btn-primary">
-                <i class="fas fa-plus me-1"></i> Add Agent
-            </a>
-        </div>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table mb-0" id="agentsTable">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Username</th>
-                        <th>Full Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Credits</th>
-                        <th>Status</th>
-                        <th>Last Login</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for agent in agents %}
-                    <tr>
-                        <td style="font-size:12px;color:#94a3b8">#{{ agent.id }}</td>
-                        <td style="font-weight:600">{{ agent.username }}</td>
-                        <td>{{ agent.full_name }}</td>
-                        <td style="font-size:13px">{{ agent.email }}</td>
-                        <td style="font-size:13px">{{ agent.phone }}</td>
-                        <td>
-                            <span class="badge {% if agent.credit_balance <= 0 %}bg-danger{% elif agent.credit_balance <= 5 %}bg-warning text-dark{% else %}bg-success{% endif %}"
-                                  style="font-size:12px;padding:5px 10px">
-                                <i class="fas fa-coins me-1"></i>{{ agent.credit_balance }}
-                            </span>
-                        </td>
-                        <td>
-                            {% if agent.is_active %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-danger">Inactive</span>
-                            {% endif %}
-                        </td>
-                        <td style="font-size:12px;color:#94a3b8">
-                            {{ agent.last_login.strftime('%d %b %Y %H:%M') if agent.last_login else 'Never' }}
-                        </td>
-                        <td>
-                            <a href="{{ url_for('toggle_agent', agent_id=agent.id) }}"
-                               class="btn btn-sm {% if agent.is_active %}btn-warning{% else %}btn-success{% endif %}"
-                               onclick="return confirm('Are you sure?')">
-                                {% if agent.is_active %}
-                                    <i class="fas fa-ban"></i>
-                                {% else %}
-                                    <i class="fas fa-check"></i>
-                                {% endif %}
-                            </a>
-                            <button class="btn btn-sm btn-secondary change-pw-btn"
-                                    data-agent-id="{{ agent.id }}"
-                                    data-agent-name="{{ agent.full_name }}">
-                                <i class="fas fa-key"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-primary credit-btn"
-                                    data-agent-id="{{ agent.id }}"
-                                    data-agent-name="{{ agent.full_name }}"
-                                    data-agent-credits="{{ agent.credit_balance }}"
-                                    title="Add credits">
-                                <i class="fas fa-coins"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
 <!-- Change Password Modal -->
 <div class="modal fade" id="changePwModal" tabindex="-1">
     <div class="modal-dialog">
@@ -230,15 +303,70 @@
     </div>
 </div>
 
+<!-- Device Max Modal -->
+<div class="modal fade" id="deviceMaxModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-mobile-alt me-2 text-info"></i> Device Limit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3" style="font-size:13px">
+                    Agent: <strong id="deviceMaxAgentName"></strong>
+                </p>
+                <div class="mb-2">
+                    <label class="form-label fw-bold">Max Devices Allowed</label>
+                    <input type="number" class="form-control" id="deviceMaxInput"
+                           min="1" max="10" placeholder="e.g. 3" value="3">
+                    <div class="form-text">Leave blank to use global default</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info btn-sm text-white" id="deviceMaxSaveBtn">
+                    <i class="fas fa-save me-1"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resign Modal -->
+<div class="modal fade" id="resignModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header" id="resignModalHeader">
+                <h5 class="modal-title" id="resignModalTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:13px" id="resignModalBody"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm" id="resignConfirmBtn"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+var _deviceMaxAgentId = null;
+
     $(document).ready(function () {
-        $('#agentsTable').DataTable({ pageLength: 25, order: [[0, 'desc']] });
+        var table = $('#agentsTable').DataTable({ pageLength: 25, order: [[0, 'desc']], searching: true, dom: 'lrtip' });
+
+        $('#agentSearch').on('keyup', function () {
+            table.search(this.value).draw();
+        });
 
         var changePwModal = new bootstrap.Modal(document.getElementById('changePwModal'));
         var creditModal = new bootstrap.Modal(document.getElementById('creditModal'));
+        var deviceMaxModal = new bootstrap.Modal(document.getElementById('deviceMaxModal'));
 
         $(document).on('click', '.change-pw-btn', function () {
             var agentId = $(this).data('agent-id');
@@ -264,6 +392,81 @@
             $('#creditAgentBalance').text($(this).data('agent-credits'));
             creditModal.show();
         });
+
+        $(document).on('click', '.device-max-btn', function () {
+            _deviceMaxAgentId = $(this).data('agent-id');
+            $('#deviceMaxAgentName').text($(this).data('agent-name'));
+            // Load current value
+            $.getJSON('/admin/agent/' + _deviceMaxAgentId + '/device-limit', function(data) {
+                $('#deviceMaxInput').val(data.max_devices || '');
+            });
+            deviceMaxModal.show();
+        });
+
+        $('#deviceMaxSaveBtn').on('click', function () {
+            var val = $('#deviceMaxInput').val();
+            $.post('/admin/agent/' + _deviceMaxAgentId + '/device-limit', { max_devices: val }, function(data) {
+                if (data.ok) {
+                    deviceMaxModal.hide();
+                    alert('Device limit saved.');
+                } else {
+                    alert(data.msg || 'Error saving.');
+                }
+            });
+        });
+
+        var resignModal = new bootstrap.Modal(document.getElementById('resignModal'));
+        var _resignAgentId = null;
+
+        $(document).on('click', '.resign-btn', function () {
+            _resignAgentId = $(this).data('agent-id');
+            var name = $(this).data('agent-name');
+            var isResigned = $(this).data('is-resigned') === true || $(this).data('is-resigned') === 'true';
+            var resignedAt = $(this).data('resigned-at');
+            if (isResigned) {
+                $('#resignModalTitle').html('<i class="fas fa-door-open me-2 text-secondary"></i> Un-Resign Agent');
+                $('#resignModalBody').html('Agent <strong>' + name + '</strong> was resigned on <strong>' + resignedAt + '</strong>.<br><br>Remove the resignation and reactivate their account?');
+                $('#resignConfirmBtn').text('Un-Resign').removeClass('btn-danger').addClass('btn-secondary');
+            } else {
+                $('#resignModalTitle').html('<i class="fas fa-door-open me-2 text-danger"></i> Resign Agent');
+                $('#resignModalBody').html('Mark <strong>' + name + '</strong> as resigned?<br><br>Their account will be deactivated and the resign date will be recorded.');
+                $('#resignConfirmBtn').text('Confirm Resign').removeClass('btn-secondary').addClass('btn-danger');
+            }
+            resignModal.show();
+        });
+
+        $('#resignConfirmBtn').on('click', function () {
+            $.post('/admin/agent/' + _resignAgentId + '/resign', function (data) {
+                if (data.ok) {
+                    resignModal.hide();
+                    location.reload();
+                }
+            });
+        });
+
+        var tgLinkModal = new bootstrap.Modal(document.getElementById('tgLinkModal'));
+        $(document).on('click', '.gen-tg-btn', function () {
+            var agentId = $(this).data('agent-id');
+            var agentName = $(this).data('agent-name');
+            $('#tgAgentName').text(agentName);
+            $('#tgTokenSection').addClass('d-none');
+            $('#tgTokenLoading').removeClass('d-none');
+            tgLinkModal.show();
+            $.post('/admin/agent/' + agentId + '/gen-tg-token', function (data) {
+                $('#tgTokenLoading').addClass('d-none');
+                $('#tgTokenDisplay').text(data.token);
+                $('#tgTokenInAlert').text(data.token);
+                $('#tgTokenSection').removeClass('d-none');
+            });
+        });
     });
+</script>
+<script>
+function copyTgToken() {
+    var t = document.getElementById('tgTokenDisplay').textContent;
+    navigator.clipboard.writeText('/register ' + t).then(function() {
+        alert('Copied: /register ' + t);
+    });
+}
 </script>
 {% endblock %}

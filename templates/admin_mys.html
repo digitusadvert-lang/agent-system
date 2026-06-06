@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block page_title %}MYS Search{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>MYS</h2>
+    <p>Search Malaysia voter / contact database (19.5M records)</p>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label">Search By</label>
+                <select class="form-select" id="searchType">
+                    <option value="keyword">Keyword (All Fields)</option>
+                    <option value="name">Name</option>
+                    <option value="ic">IC Number (MyKad)</option>
+                    <option value="phone">Phone Number</option>
+                    <option value="state">State (Negeri)</option>
+                </select>
+            </div>
+            <div class="col-md-7">
+                <label class="form-label">Search Term</label>
+                <input type="text" class="form-control" id="searchTerm"
+                       placeholder="e.g. Ahmad bin Ali, 800101XXXXXX, 0123456789...">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" id="searchBtn" onclick="doSearch()">
+                    <i class="fas fa-search"></i> Search
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="resultsArea" style="display:none">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0" id="resultsTitle">Results</h5>
+            <div class="d-flex align-items-center gap-2">
+                <span id="resultsBadge"></span>
+                <button class="btn btn-sm btn-outline-success" id="downloadBtn" onclick="downloadAll()" style="display:none">
+                    <i class="fas fa-download"></i> Download CSV
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div style="overflow-x:auto;width:100%">
+                <table class="table table-striped table-hover mb-0 table-sm" id="resultsTable" style="width:100%;table-layout:auto">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>IC</th>
+                            <th>IC Lama</th>
+                            <th>Nama</th>
+                            <th>Jantina</th>
+                            <th>Bangsa</th>
+                            <th>Negeri</th>
+                            <th>Lokaliti</th>
+                            <th>Alamat</th>
+                            <th>Poskod</th>
+                            <th>Tel</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var dt = null;
+var allResults = [];
+
+function s(v)  { return v || '-'; }
+function sm(v) { return '<span style="font-family:monospace;font-size:12px">' + (v || '-') + '</span>'; }
+function fmtPoskod(v) {
+    if (!v) return '-';
+    var str = String(v);
+    return str.endsWith('.0') ? str.slice(0, -2) : str;
+}
+function escCsv(v) {
+    v = (v == null ? '' : String(v)).replace(/"/g, '""');
+    return '"' + v + '"';
+}
+
+function downloadAll() {
+    if (!allResults.length) return;
+    var headers = ['IC','IC Lama','Nama','Jantina','Bangsa','Negeri','Lokaliti','Alamat','Poskod','Tel'];
+    var rows = allResults.map(function(r) {
+        var poskod = String(r.poskod || '');
+        if (poskod.endsWith('.0')) poskod = poskod.slice(0, -2);
+        return [r.ic, r.ic_lama, r.nama, r.jantina, r.bangsa, r.negeri, r.lokaliti, r.alamat, poskod, r.tel]
+            .map(escCsv).join(',');
+    });
+    var csv = '﻿' + [headers.join(',')].concat(rows).join('\r\n');
+    var blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'MYS_' + $('#searchType').val() + '_' + $('#searchTerm').val().replace(/\s+/g,'_') + '.csv';
+    link.click();
+}
+
+function downloadRow(r) {
+    var headers = ['IC','IC Lama','Nama','Jantina','Bangsa','Negeri','Lokaliti','Alamat','Poskod','Tel'];
+    var poskod = String(r.poskod || '');
+    if (poskod.endsWith('.0')) poskod = poskod.slice(0, -2);
+    var row = [r.ic, r.ic_lama, r.nama, r.jantina, r.bangsa, r.negeri, r.lokaliti, r.alamat, poskod, r.tel]
+        .map(escCsv).join(',');
+    var csv = '﻿' + headers.join(',') + '\r\n' + row;
+    var blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'MYS_' + (r.ic || 'record') + '.csv';
+    link.click();
+}
+
+function doSearch() {
+    var term = $('#searchTerm').val().trim();
+    if (!term) { alert('Please enter a search term.'); return; }
+
+    var btn = $('#searchBtn');
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Searching...');
+
+    $.post('/admin/mys/search', {
+        search_type: $('#searchType').val(),
+        term: term
+    }, function(data) {
+        btn.prop('disabled', false).html('<i class="fas fa-search"></i> Search');
+        if (!data.meta.ok) { alert(data.meta.message || 'Search failed.'); return; }
+
+        allResults = data.results;
+        dt.clear();
+        dt.rows.add(data.results);
+        dt.draw();
+
+        var badge = data.meta.truncated
+            ? '<span class="badge bg-warning text-dark">First ' + data.meta.limit + '</span>'
+            : '<span class="badge bg-success">All Results</span>';
+        $('#resultsTitle').text('MYS — ' + data.results.length + ' record(s)');
+        $('#resultsBadge').html(badge);
+        $('#downloadBtn').show();
+        $('#resultsArea').show();
+    }).fail(function() {
+        btn.prop('disabled', false).html('<i class="fas fa-search"></i> Search');
+        alert('Server error. Please try again.');
+    });
+}
+
+$(document).ready(function() {
+    dt = $('#resultsTable').DataTable({
+        data: [],
+        columns: [
+            { data: null, orderable: false,
+              render: function(d,t,r,m){ return '<small>' + (m.row+1) + '</small>'; } },
+            { data: 'ic',       render: function(v){ return sm(v); } },
+            { data: 'ic_lama',  render: function(v){ return '<small style="color:#6b7280">' + (v||'-') + '</small>'; } },
+            { data: 'nama',     render: function(v){ return '<strong style="font-size:12px;white-space:nowrap">'+(v||'-')+'</strong>'; } },
+            { data: 'jantina',  className: 'text-center',
+              render: function(v){ return '<small>' + (v||'-') + '</small>'; } },
+            { data: 'bangsa',   render: function(v){ return '<small>' + (v||'-') + '</small>'; } },
+            { data: 'negeri',   render: function(v){ return '<small>' + (v||'-') + '</small>'; } },
+            { data: 'lokaliti', render: function(v){ return '<small>' + (v||'-') + '</small>'; } },
+            { data: 'alamat',
+              render: function(v){ return '<small style="display:block;max-width:230px;line-height:1.5;word-break:break-word">'+(v||'-')+'</small>'; } },
+            { data: 'poskod',   className: 'text-end',
+              render: function(v){ return '<small>' + fmtPoskod(v) + '</small>'; } },
+            { data: 'tel',      render: function(v){ return sm(v); } },
+            { data: null, orderable: false,
+              render: function(d,t,r){
+                return '<button class="dl-row-btn" title="Download this record" '
+                  + 'style="background:none;border:1px solid #d1d5db;border-radius:4px;padding:2px 6px;cursor:pointer;color:#6b7280">'
+                  + '<i class="fas fa-download" style="font-size:10px"></i></button>';
+              }
+            }
+        ],
+        pageLength: 50,
+        lengthMenu: [25, 50, 100, 200],
+        order: [[3, 'asc']],
+        language: { emptyTable: 'Enter a search term above to find records.' }
+    });
+    // Force full-width after every draw
+    dt.on('draw', function(){ dt.columns.adjust(); });
+
+    $('#resultsTable').on('click', '.dl-row-btn', function() {
+        var r = dt.row($(this).closest('tr')).data();
+        if (r) downloadRow(r);
+    });
+
+    $('#searchTerm').on('keypress', function(e) {
+        if (e.which === 13) doSearch();
+    });
+});
+</script>
+<script>
+(function(){var p=new URLSearchParams(window.location.search),q=p.get('q'),t=p.get('type');if(q){$(document).ready(function(){$('#searchTerm').val(q);if(t)$('#searchType').val(t);doSearch();});}})();
+</script>
+{% endblock %}

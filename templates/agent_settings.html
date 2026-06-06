@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Settings</h2>
+</div>
+
+<div class="row g-3" style="max-width:600px">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="fab fa-telegram me-2" style="color:#229ED9"></i> Telegram Link
+            </div>
+            <div class="card-body">
+
+                {% if linked %}
+                <!-- LINKED STATE -->
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div style="width:44px;height:44px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center">
+                        <i class="fas fa-check" style="color:#16a34a;font-size:18px"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:600;color:#16a34a">Telegram Linked</div>
+                        <div style="font-size:13px;color:#6b7280">Your account is connected. New device logins will notify you on Telegram for approval.</div>
+                    </div>
+                </div>
+                <form method="POST">
+                    <input type="hidden" name="action" value="unlink">
+                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                            onclick="return confirm('Unlink Telegram from your account?')">
+                        Unlink Telegram
+                    </button>
+                </form>
+
+                {% else %}
+                <!-- NOT LINKED STATE -->
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div style="width:44px;height:44px;border-radius:50%;background:#fef3c7;display:flex;align-items:center;justify-content:center">
+                        <i class="fas fa-exclamation" style="color:#d97706;font-size:18px"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:600;color:#d97706">Not Linked</div>
+                        <div style="font-size:13px;color:#6b7280">Link your Telegram to approve new device logins yourself without waiting for admin.</div>
+                    </div>
+                </div>
+
+                <hr>
+                <p style="font-weight:600;margin-bottom:6px">How to link:</p>
+                <ol style="font-size:13.5px;color:#374151;line-height:2">
+                    <li>Click <strong>Generate Code</strong> below to get your unique code</li>
+                    <li>Open Telegram and search for
+                        {% if bot_username %}
+                            <a href="https://t.me/{{ bot_username }}" target="_blank" style="color:#229ED9;font-weight:600">@{{ bot_username }}</a>
+                        {% else %}
+                            our Telegram bot (ask your admin for the bot name)
+                        {% endif %}
+                    </li>
+                    <li>Send this message to the bot: <code>/register YOUR_CODE</code></li>
+                    <li>You'll receive a confirmation message when linked</li>
+                </ol>
+
+                {% if token %}
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 18px;margin:16px 0">
+                    <div style="font-size:11px;color:#6b7280;margin-bottom:4px">Your registration code (expires when used)</div>
+                    <div style="font-size:28px;font-weight:700;font-family:monospace;letter-spacing:4px;color:#15803d">{{ token }}</div>
+                    <div style="font-size:12px;color:#6b7280;margin-top:6px">Send to bot: <code>/register {{ token }}</code></div>
+                </div>
+                {% endif %}
+
+                <form method="POST" class="mt-3">
+                    <input type="hidden" name="action" value="gen_token">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fab fa-telegram me-2"></i>
+                        {{ 'Generate New Code' if token else 'Generate Code' }}
+                    </button>
+                </form>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

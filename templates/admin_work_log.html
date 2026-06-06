@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block page_title %}Work Log{% endblock %}
+
+{% block content %}
+<style>
+.cat-badge { font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+.cat-Security    { background:#fee2e2; color:#991b1b; }
+.cat-Feature     { background:#dbeafe; color:#1e40af; }
+.cat-Performance { background:#dcfce7; color:#166534; }
+.cat-Bug-Fix     { background:#fef3c7; color:#92400e; }
+.cat-UI          { background:#f3e8ff; color:#6b21a8; }
+.cat-Other       { background:#f1f5f9; color:#475569; }
+.hours-cell { font-weight: 700; color: #1e293b; white-space: nowrap; }
+.desc-cell { font-size: 12.5px; color: #475569; line-height: 1.5; }
+
+/* ── Print / Invoice styles ───────────────────────── */
+@media print {
+    .no-print { display: none !important; }
+    .sidebar, .topbar, .sidebar-overlay, .mobile-bottom-nav { display: none !important; }
+    .main-wrapper { margin-left: 0 !important; padding: 0 !important; }
+    body { background: white !important; }
+    .print-header { display: block !important; }
+    .card { border: 1px solid #e2e8f0 !important; box-shadow: none !important; }
+    .invoice-table th { background: #f8fafc !important; -webkit-print-color-adjust: exact; }
+    .cat-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+.print-header { display: none; }
+</style>
+
+<!-- Print-only invoice header -->
+<div class="print-header mb-4 pb-3" style="border-bottom:2px solid #1e293b">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+            <div style="font-size:22px;font-weight:800;color:#1e293b">DEVELOPMENT INVOICE</div>
+            <div style="font-size:14px;color:#64748b;margin-top:4px">Agent Management System — WTP</div>
+        </div>
+        <div style="text-align:right;font-size:13px;color:#475569">
+            <div><strong>Date:</strong> {{ entries[0].date.strftime('%d %B %Y') if entries else '' }}</div>
+            <div><strong>Total Hours:</strong> {{ '%.1f'|format(total_hours) }} hrs</div>
+        </div>
+    </div>
+</div>
+
+<div class="page-header no-print">
+    <div>
+        <h2 style="margin:0">Work Log</h2>
+        <p style="margin:4px 0 0;color:#64748b;font-size:13.5px">
+            Record of all development work — use to generate invoice for Boss
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+            <i class="fas fa-print me-1"></i> Print Invoice
+        </button>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% for cat, msg in messages %}
+<div class="alert alert-{{ 'success' if cat == 'success' else 'info' }} alert-dismissible fade show no-print">
+    {{ msg }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endwith %}
+
+<!-- Summary strip -->
+<div class="row g-3 mb-3 no-print">
+    <div class="col-auto">
+        <div class="card px-3 py-2" style="border:1px solid #e2e8f0">
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Total Entries</div>
+            <div style="font-size:24px;font-weight:700;color:#1e293b">{{ entries|length }}</div>
+        </div>
+    </div>
+    <div class="col-auto">
+        <div class="card px-3 py-2" style="border:1px solid #e2e8f0">
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">Total Hours</div>
+            <div style="font-size:24px;font-weight:700;color:#1e293b">{{ '%.1f'|format(total_hours) }}</div>
+        </div>
+    </div>
+    {% set cats = entries|map(attribute='category')|list|unique|list %}
+    {% for cat in ['Security','Feature','Performance','Bug Fix','UI'] %}
+    {% set count = entries|selectattr('category','equalto',cat)|list|length %}
+    {% if count > 0 %}
+    <div class="col-auto">
+        <div class="card px-3 py-2" style="border:1px solid #e2e8f0">
+            <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px">{{ cat }}</div>
+            <div style="font-size:24px;font-weight:700;color:#1e293b">{{ count }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<!-- Work log table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-list me-2 text-muted"></i> All Work Entries</span>
+    </div>
+    <div class="card-body p-0">
+        <table class="table mb-0 invoice-table" style="font-size:13.5px">
+            <thead>
+                <tr style="background:#f8fafc">
+                    <th style="width:95px">Date</th>
+                    <th style="width:110px">Category</th>
+                    <th style="width:220px">Title</th>
+                    <th>Description</th>
+                    <th style="width:60px;text-align:right">Hours</th>
+                    <th style="width:50px" class="no-print"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in entries %}
+                <tr>
+                    <td style="font-size:12px;color:#64748b;white-space:nowrap">
+                        {{ e.date.strftime('%d %b %Y') }}
+                    </td>
+                    <td>
+                        <span class="cat-badge cat-{{ e.category|replace(' ','-') }}">{{ e.category }}</span>
+                    </td>
+                    <td style="font-weight:600;color:#1e293b">{{ e.title }}</td>
+                    <td class="desc-cell">{{ e.description or '—' }}</td>
+                    <td class="hours-cell text-end">{{ '%.1f'|format(e.hours or 0) }}</td>
+                    <td class="no-print">
+                        <form method="POST" onsubmit="return confirm('Delete this entry?')">
+                            <input type="hidden" name="action" value="delete">
+                            <input type="hidden" name="entry_id" value="{{ e.id }}">
+                            <button class="btn btn-sm btn-outline-danger py-0 px-1">
+                                <i class="fas fa-trash" style="font-size:11px"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center text-muted py-4">No entries yet.</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background:#f8fafc;font-weight:700">
+                    <td colspan="4" style="text-align:right;color:#475569;font-size:13px">Total Hours</td>
+                    <td class="hours-cell text-end" style="font-size:16px">{{ '%.1f'|format(total_hours) }}</td>
+                    <td class="no-print"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<!-- Add new entry form -->
+<div class="card mt-4 no-print">
+    <div class="card-header">
+        <i class="fas fa-plus me-2 text-muted"></i> Add New Entry
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <input type="hidden" name="action" value="add">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label fw-bold" style="font-size:13px">Date</label>
+                    <input type="date" class="form-control form-control-sm" name="date"
+                           value="{{ now.strftime('%Y-%m-%d') if now else '' }}" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold" style="font-size:13px">Category</label>
+                    <select class="form-select form-select-sm" name="category">
+                        <option value="Feature">Feature</option>
+                        <option value="Security">Security</option>
+                        <option value="Performance">Performance</option>
+                        <option value="Bug Fix">Bug Fix</option>
+                        <option value="UI">UI</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label fw-bold" style="font-size:13px">Hours</label>
+                    <input type="number" class="form-control form-control-sm" name="hours"
+                           min="0" max="99" step="0.5" value="1.0" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold" style="font-size:13px">Title</label>
+                    <input type="text" class="form-control form-control-sm" name="title"
+                           placeholder="e.g. Agent Credit System" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold" style="font-size:13px">Description</label>
+                    <input type="text" class="form-control form-control-sm" name="description"
+                           placeholder="What was built / changed">
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i> Add Entry
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Server spec card -->
+<div class="card mt-4 no-print" style="border:1px solid #e2e8f0">
+    <div class="card-header">
+        <i class="fas fa-server me-2 text-muted"></i> Recommended Server Spec — Agent System
+    </div>
+    <div class="card-body" style="font-size:13.5px">
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div style="border-left:3px solid #64748b;padding-left:12px">
+                    <div class="fw-bold mb-1">Current (1 vCPU / 1 GB RAM)</div>
+                    <p class="text-muted mb-1">Fine for: up to ~15 concurrent agents, light search load.</p>
+                    <p class="mb-0 text-muted">Pain point: SQLite write lock under burst traffic even with WAL.
+                    RAM too small for large FTS5 index to stay cached.</p>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div style="border-left:3px solid #3b82f6;padding-left:12px">
+                    <div class="fw-bold mb-1" style="color:#1d4ed8">Recommended: 2 vCPU / 4 GB RAM</div>
+                    <p class="mb-1">Handles ~50–80 concurrent agents comfortably.</p>
+                    <p class="mb-0 text-muted">SQLite WAL + search cache will keep DB pressure low.
+                    4 GB lets SQLite and FTS5 index live in memory — searches feel instant.
+                    Cost on DigitalOcean: ~USD 24/month.</p>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div style="border-left:3px solid #16a34a;padding-left:12px">
+                    <div class="fw-bold mb-1" style="color:#166534">Scale-up: 4 vCPU / 8 GB RAM + PostgreSQL</div>
+                    <p class="mb-1">For 100+ concurrent agents or 10M+ customer records.</p>
+                    <p class="mb-0 text-muted">Migrate SQLite → PostgreSQL (already in your scaling plan).
+                    PostgreSQL handles true parallel writes — no locking at all.
+                    Cost: ~USD 48/month droplet + USD 15/month managed DB.</p>
+                </div>
+            </div>
+        </div>
+        <div class="alert alert-info mt-3 mb-0" style="font-size:12.5px">
+            <strong>Quick action:</strong>
+            Resize the existing DigitalOcean droplet from 1 GB → 4 GB (2 vCPU) — takes about 2 minutes, zero data loss.
+            That alone will handle most growth without any code changes.
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Set today's date as default for the add-entry form
+    document.addEventListener('DOMContentLoaded', function() {
+        var d = document.querySelector('input[name="date"]');
+        if (d && !d.value) {
+            var today = new Date();
+            d.value = today.toISOString().split('T')[0];
+        }
+    });
+</script>
+{% endblock %}

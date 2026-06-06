@@ -39,25 +39,31 @@
         </form>
 
         <div class="text-center mt-4 pt-3" style="border-top:1px solid #f1f5f9">
-            <span class="text-muted" style="font-size:12px">
-                <i class="fas fa-info-circle me-1"></i>
-                Contact your administrator for access
-            </span>
+            <a href="{{ url_for('forgot_password') }}" style="font-size:13px;color:#6366f1;text-decoration:none">
+                <i class="fas fa-key me-1"></i> Forgot Password?
+            </a>
         </div>
     </div>
 </div>
 {% block scripts %}
 <script>
-    function generateFingerprint() {
-        var c = [navigator.userAgent, navigator.language, screen.width+'x'+screen.height,
-                 screen.colorDepth, new Date().getTimezoneOffset(),
-                 navigator.hardwareConcurrency||'', navigator.platform];
-        var str = c.join('|'), hash = 0;
-        for (var i = 0; i < str.length; i++) { hash = ((hash<<5)-hash)+str.charCodeAt(i); hash|=0; }
-        return Math.abs(hash).toString(16).padStart(8,'0')+'_'+
-               btoa(navigator.userAgent).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+    function getDeviceId() {
+        var KEY = 'wtp_device_id';
+        var id = null;
+        try { id = localStorage.getItem(KEY); } catch(e) {}
+        if (!id) {
+            // Generate UUID v4
+            id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+            try { localStorage.setItem(KEY, id); } catch(e) {}
+        }
+        // Write to cookie as server-side backup
+        document.cookie = 'fp=' + id + '; path=/; SameSite=Strict; max-age=31536000';
+        return id;
     }
-    document.getElementById('fp_login').value = generateFingerprint();
+    document.getElementById('fp_login').value = getDeviceId();
 </script>
 {% endblock %}
 {% endblock login_content %}

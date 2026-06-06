@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block page_title %}Process Large File{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-server me-2"></i>Process Large File from Server</h2>
+    <p>For files over 50MB — SCP the file to the server first, then select it below.</p>
+</div>
+
+<!-- HOW TO SCP -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header fw-bold" style="background:#f1f5f9">
+        <i class="fas fa-terminal me-2"></i> Step 1 — Upload file to server via SCP (run on your PC)
+    </div>
+    <div class="card-body">
+        <div style="background:#1e293b;color:#e2e8f0;padding:14px 18px;border-radius:8px;font-family:monospace;font-size:13px;position:relative">
+            scp "C:\Users\DELL\Desktop\agent-system\Data\TOTAL 1868536.xlsx" root@159.223.77.202:/var/www/agentsystem/uploads/
+            <button onclick="copyCmd()" class="btn btn-sm btn-outline-light" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px">
+                <i class="fas fa-copy me-1"></i>Copy
+            </button>
+        </div>
+        <p class="mt-2 mb-0 text-muted" style="font-size:12px">
+            <i class="fas fa-info-circle me-1"></i>
+            After SCP finishes, refresh this page — your file will appear in Step 2 below.
+        </p>
+    </div>
+</div>
+
+<!-- FILE LIST — Step 2 -->
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header fw-bold d-flex justify-content-between align-items-center" style="background:#f1f5f9">
+        <span><i class="fas fa-folder-open me-2 text-warning"></i> Step 2 — Select your file to process</span>
+        <button onclick="location.reload()" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-sync-alt me-1"></i> Refresh
+        </button>
+    </div>
+    <div class="card-body p-0">
+        {% if existing_files %}
+        <table class="table table-hover mb-0" style="font-size:13px">
+            <thead class="table-light">
+                <tr>
+                    <th>Filename</th>
+                    <th>Size</th>
+                    <th>Uploaded</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in existing_files %}
+                <tr id="row_{{ loop.index }}" {% if loop.first %}style="background:#f0fdf4"{% endif %}>
+                    <td>
+                        <i class="fas fa-file-excel me-1 text-success"></i>
+                        {{ f.name }}
+                        {% if loop.first %}
+                        <span class="badge bg-success ms-1">LATEST</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {% if f.size_mb > 50 %}bg-danger{% elif f.size_mb > 20 %}bg-warning text-dark{% else %}bg-light text-dark{% endif %}">
+                            {{ f.size_mb }} MB
+                        </span>
+                    </td>
+                    <td style="color:#94a3b8;font-size:12px">
+                        {{ (f.mtime | int) | filesizeformat if false else '' }}
+                        <span class="file-mtime" data-ts="{{ f.mtime }}"></span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="selectAndProcess('{{ f.path }}')">
+                            <i class="fas fa-play me-1"></i> Process This File
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="p-4 text-center text-muted">
+            <i class="fas fa-inbox fa-2x mb-2"></i><br>
+            No files found yet. SCP your file first, then refresh this page.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- HIDDEN PROCESS FORM -->
+<form method="POST" id="processForm" style="display:none">
+    <input type="text" name="file_path" id="file_path_input">
+</form>
+
+<a href="{{ url_for('admin_upload') }}" class="btn btn-outline-secondary">
+    <i class="fas fa-arrow-left me-1"></i> Back to Upload
+</a>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function selectAndProcess(path) {
+    if (!confirm('Process file: ' + path.split('/').pop() + '?\n\nThis will read the file and take you to the column mapping page.')) return;
+    document.getElementById('file_path_input').value = path;
+    document.getElementById('processForm').style.display = 'block';
+    document.getElementById('processForm').submit();
+}
+
+function copyCmd() {
+    navigator.clipboard.writeText('scp "C:\\Users\\DELL\\Desktop\\agent-system\\Data\\TOTAL 1868536.xlsx" root@159.223.77.202:/var/www/agentsystem/uploads/');
+    alert('Command copied!');
+}
+
+// Show human-readable timestamps
+document.querySelectorAll('.file-mtime').forEach(function(el) {
+    var ts = parseFloat(el.dataset.ts) * 1000;
+    var d = new Date(ts);
+    el.textContent = d.toLocaleString('en-GB', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
+});
+
+// Auto-highlight newest file row
+document.querySelector('#row_1') && document.querySelector('#row_1').scrollIntoView({behavior:'smooth', block:'center'});
+</script>
+{% endblock %}

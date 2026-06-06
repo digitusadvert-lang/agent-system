@@ -1,0 +1,615 @@
+{% extends "base.html" %}
+{% block page_title %}Customer Map{% endblock %}
+
+{% block content %}
+<style>
+  #map-wrap {
+    display: flex;
+    gap: 16px;
+    height: calc(100vh - 130px);
+    min-height: 500px;
+  }
+
+  /* ── Search panel ── */
+  #map-panel {
+    width: 320px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+  }
+
+  #map-panel .card { margin-bottom: 0; }
+
+  #result-list {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 420px;
+  }
+
+  .cust-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    font-size: 12.5px;
+    transition: background 0.15s;
+  }
+  .cust-item:hover { background: #f0f4ff; }
+  .cust-item .cust-name { font-weight: 600; color: #1e2a3b; }
+  .cust-item .cust-sub  { color: #64748b; font-size: 11.5px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cust-item.geocoded   { border-left: 3px solid #6366f1; }
+  .cust-item.failed     { border-left: 3px solid #e5e7eb; opacity: 0.6; }
+
+  /* ── Map container ── */
+  #map-container {
+    flex: 1;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+    position: relative;
+  }
+
+  #map { height: 100%; width: 100%; }
+
+  #map-status {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30,42,59,0.88);
+    color: white;
+    padding: 7px 18px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 999;
+    white-space: nowrap;
+    display: none;
+  }
+
+  #progress-bar-wrap {
+    height: 4px;
+    background: #e8ecf0;
+    border-radius: 2px;
+    overflow: hidden;
+    display: none;
+  }
+  #progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    width: 0%;
+    transition: width 0.3s;
+    border-radius: 2px;
+  }
+
+  /* Popup */
+  .cust-popup { font-size: 13px; min-width: 200px; }
+  .cust-popup strong { font-size: 14px; color: #1e2a3b; }
+  .cust-popup .pp-row { margin-top: 4px; color: #374151; }
+  .cust-popup .pp-label { color: #6b7280; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+  .cust-popup a.detail-link {
+    display: inline-block; margin-top: 8px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; padding: 4px 12px; border-radius: 6px;
+    font-size: 12px; font-weight: 600; text-decoration: none;
+  }
+
+  @media (max-width: 767px) {
+    #map-wrap   { flex-direction: column; height: auto; }
+    #map-panel  { width: 100%; }
+    #map-container { height: 55vh; }
+    #result-list { max-height: 200px; }
+  }
+</style>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+
+<div class="page-header">
+  <h2><i class="fas fa-map-marked-alt me-2"></i>Customer Map</h2>
+  <p>Search customers and view their locations on the map. Pins appear as addresses are resolved.</p>
+</div>
+
+<div id="map-wrap">
+  <!-- ── Left panel ── -->
+  <div id="map-panel">
+
+    <!-- Search form -->
+    <div class="card">
+      <div class="card-header" style="padding:12px 16px;">
+        <i class="fas fa-search me-2 text-primary"></i>Search Customers
+      </div>
+      <div class="card-body" style="padding:14px 16px;">
+        <div class="mb-2">
+          <label class="form-label" style="font-size:12px;">Search By</label>
+          <select class="form-select form-select-sm" id="searchType">
+            <option value="address">Address / Location</option>
+            <option value="data_source">Property / Data Source</option>
+            <option value="name">Name</option>
+            <option value="keyword">Keyword</option>
+            <option value="phone">Phone Number</option>
+            <option value="ic">IC Number</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:12px;">Search Term</label>
+          <input type="text" class="form-control form-control-sm" id="searchTerm"
+                 placeholder="e.g. Selangor, Johor Bahru…" autocomplete="off">
+        </div>
+        <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+        <button class="btn btn-primary w-100 mt-2" id="searchBtn" style="font-size:13px;">
+          <i class="fas fa-search me-1"></i> Search & Plot
+        </button>
+        <button class="btn btn-outline-secondary w-100 mt-2" id="clearBtn" style="font-size:13px; display:none;">
+          <i class="fas fa-times me-1"></i> Clear Map
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats bar -->
+    <div id="stats-card" class="card" style="display:none;">
+      <div class="card-body" style="padding:10px 16px;">
+        <div class="d-flex justify-content-between" style="font-size:12.5px;">
+          <span><i class="fas fa-users me-1 text-primary"></i><span id="stat-total">0</span> found</span>
+          <span><i class="fas fa-map-pin me-1 text-success"></i><span id="stat-pinned">0</span> pinned</span>
+          <span><i class="fas fa-question-circle me-1 text-muted"></i><span id="stat-failed">0</span> no address</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result list -->
+    <div class="card" id="list-card" style="display:none; flex:1; min-height:0;">
+      <div class="card-header" style="padding:10px 16px; font-size:13px;">
+        <i class="fas fa-list me-1"></i> Results
+      </div>
+      <div id="result-list"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Map ── -->
+  <div id="map-container">
+    <div id="map"></div>
+    <div id="map-status"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<script>
+// ─── Malaysian city / area → [lat, lng] lookup ────────────────────────────
+const MY_LOCS = {
+  // Federal Territories
+  'kuala lumpur':[3.1390,101.6869],'kl':[3.1390,101.6869],
+  'putrajaya':[2.9264,101.6964],'cyberjaya':[2.9213,101.6559],
+  'labuan':[5.2831,115.2308],
+  // Selangor
+  'selangor':[3.0738,101.5183],
+  'petaling jaya':[3.1073,101.6067],'pj':[3.1073,101.6067],
+  'shah alam':[3.0733,101.5185],'subang jaya':[3.0565,101.5853],
+  'klang':[3.0449,101.4455],'port klang':[3.0044,101.4090],
+  'ampang':[3.1478,101.7603],'cheras':[3.0875,101.7367],
+  'kajang':[2.9933,101.7895],'puchong':[3.0274,101.6242],
+  'kepong':[3.2041,101.6330],'damansara':[3.1523,101.6089],
+  'bangsar':[3.1264,101.6680],'rawang':[3.3152,101.5748],
+  'sepang':[2.7318,101.7058],'nilai':[2.8071,101.7980],
+  'batu caves':[3.2378,101.6836],'gombak':[3.2284,101.6842],
+  'sungai buloh':[3.1884,101.5760],'bangi':[2.9675,101.7820],
+  'semenyih':[2.9365,101.8465],'sungai besi':[3.0787,101.6991],
+  'bukit jalil':[3.0570,101.6847],'balakong':[3.0530,101.7740],
+  'wangsa maju':[3.2097,101.7319],'setapak':[3.1922,101.7113],
+  'mont kiara':[3.1717,101.6536],'hartamas':[3.1690,101.6550],
+  'brickfields':[3.1293,101.6867],'titiwangsa':[3.1750,101.7054],
+  'pandan':[3.1196,101.7544],'kepong':[3.2041,101.6330],
+  'alam damai':[3.0620,101.7629],'taman melawati':[3.2126,101.7601],
+  'bukit antarabangsa':[3.2096,101.7682],'ulu klang':[3.2033,101.7604],
+  'seri kembangan':[3.0243,101.7063],'meru':[3.1419,101.5071],
+  'jenjarom':[2.8688,101.5028],'banting':[2.8148,101.5035],
+  'kapar':[3.0989,101.3989],'sabak bernam':[3.7667,100.9878],
+  'tanjung karang':[3.4217,101.1870],'kuala selangor':[3.3536,101.2582],
+  'ijok':[3.3024,101.4155],'sg pelek':[2.9101,101.6521],
+  'dengkil':[2.8558,101.6988],'salak tinggi':[2.7539,101.7216],
+  // Johor
+  'johor':[1.4854,103.7618],'johor bahru':[1.4927,103.7414],
+  'jb':[1.4927,103.7414],'skudai':[1.5339,103.6626],
+  'kulai':[1.6630,103.5987],'kluang':[2.0265,103.3195],
+  'batu pahat':[1.8554,102.9343],'muar':[2.0441,102.5685],
+  'segamat':[2.5150,102.8162],'pontian':[1.4826,103.3867],
+  'mersing':[2.4383,103.8347],'kota tinggi':[1.7396,103.9016],
+  'iskandar puteri':[1.4237,103.6376],'pasir gudang':[1.4716,103.8905],
+  'gelang patah':[1.4236,103.6276],'ulu tiram':[1.5752,103.8018],
+  'kota iskandar':[1.5588,103.6406],'bandar penawar':[1.6194,104.2276],
+  'labis':[2.3799,103.0273],'tangkak':[2.2667,102.5550],
+  // Penang
+  'penang':[5.4141,100.3288],'pulau pinang':[5.4141,100.3288],
+  'georgetown':[5.4135,100.3298],'butterworth':[5.3991,100.3643],
+  'seberang perai':[5.3991,100.3643],'balik pulau':[5.3490,100.2389],
+  'bukit mertajam':[5.3638,100.4648],'nibong tebal':[5.1578,100.4691],
+  'bayan lepas':[5.3000,100.3083],'gelugor':[5.3836,100.3113],
+  'jelutong':[5.4003,100.3268],'kepala batas':[5.5164,100.4259],
+  'sungai bakap':[5.2444,100.4549],'parit buntar':[5.1288,100.4966],
+  // Perak
+  'perak':[4.5975,101.0901],'ipoh':[4.5975,101.0901],
+  'taiping':[4.8505,100.7339],'teluk intan':[3.9285,101.0221],
+  'sitiawan':[4.2193,100.6999],'manjung':[4.2193,100.6999],
+  'batu gajah':[4.4745,101.0302],'kampar':[4.3085,101.1556],
+  'sungai siput':[4.8283,101.0785],'kuala kangsar':[4.7701,100.9405],
+  'bidor':[3.9918,101.3148],'slim river':[3.8397,101.4012],
+  'tanjung malim':[3.6926,101.5239],'parit':[4.4336,100.9282],
+  'ayer tawar':[4.0735,100.7120],'lumut':[4.2341,100.6251],
+  // Kedah
+  'kedah':[6.1184,100.3685],'alor setar':[6.1256,100.3672],
+  'sungai petani':[5.6474,100.4882],'kulim':[5.3664,100.5573],
+  'langkawi':[6.3500,99.8000],'baling':[5.6893,100.9213],
+  'pendang':[5.9766,100.5339],'yan':[5.7946,100.4034],
+  'kuala nerang':[6.2584,100.6116],'padang terap':[6.2459,100.7456],
+  'jitra':[6.2666,100.4255],'kubang pasu':[6.3204,100.5046],
+  // Kelantan
+  'kelantan':[6.1248,102.2376],'kota bharu':[6.1248,102.2376],
+  'kb':[6.1248,102.2376],'pasir mas':[6.0440,102.1379],
+  'tanah merah':[5.8080,102.1450],'gua musang':[4.8842,101.9682],
+  'bachok':[6.0669,102.3984],'machang':[5.7632,102.2140],
+  'kuala krai':[5.5286,102.1997],'jeli':[5.6996,101.8421],
+  'pasir puteh':[5.8315,102.4035],'tumpat':[6.1991,102.1693],
+  // Terengganu
+  'terengganu':[5.3117,103.1324],'kuala terengganu':[5.3117,103.1324],
+  'kemaman':[4.2355,103.4191],'chukai':[4.2355,103.4191],
+  'dungun':[4.7587,103.4228],'besut':[5.7964,102.5627],
+  'kuala berang':[5.0538,102.9904],'hulu terengganu':[5.0538,102.9904],
+  'kerteh':[4.5072,103.4394],'paka':[4.6397,103.4342],
+  // Pahang
+  'pahang':[3.8126,103.3256],'kuantan':[3.8077,103.3260],
+  'temerloh':[3.4524,102.4173],'bentong':[3.5218,101.9163],
+  'raub':[3.7897,101.8585],'mentakab':[3.5005,102.3432],
+  'pekan':[3.4852,103.3823],'rompin':[2.7907,103.4990],
+  'cameron highlands':[4.4711,101.3844],'genting':[3.4230,101.7934],
+  'jerantut':[3.9383,102.3644],'maran':[3.7877,102.7729],
+  'bera':[3.3728,102.5034],'lipis':[4.1856,102.0461],
+  // Negeri Sembilan
+  'negeri sembilan':[2.7297,101.9381],'seremban':[2.7297,101.9381],
+  'port dickson':[2.5262,101.7965],'rembau':[2.5907,102.0946],
+  'tampin':[2.4681,102.2266],'bahau':[2.8098,102.4185],
+  'kuala pilah':[2.7386,102.2443],'gemencheh':[2.5259,102.3868],
+  'jelebu':[3.0254,102.0618],'gemas':[2.5784,102.5773],
+  // Melaka
+  'melaka':[2.1896,102.2501],'malacca':[2.1896,102.2501],
+  'alor gajah':[2.3761,102.2089],'jasin':[2.3086,102.4321],
+  'merlimau':[2.2027,102.5091],'masjid tanah':[2.3453,102.2114],
+  'ayer keroh':[2.2719,102.2908],'bukit baru':[2.2333,102.2572],
+  'klebang':[2.2248,102.1968],'durian tunggal':[2.3018,102.3153],
+  // Perlis
+  'perlis':[6.4338,100.1986],'kangar':[6.4427,100.1966],
+  'arau':[6.4333,100.2694],'padang besar':[6.6597,100.3142],
+  // Sabah
+  'sabah':[5.9804,116.0735],'kota kinabalu':[5.9804,116.0735],
+  'kk':[5.9804,116.0735],'sandakan':[5.8456,118.1183],
+  'tawau':[4.2452,117.8916],'lahad datu':[5.0285,118.3237],
+  'keningau':[5.3366,116.1624],'beaufort':[5.3671,115.7555],
+  'kota belud':[6.3517,116.4293],'ranau':[5.9607,116.6710],
+  'semporna':[4.4805,118.6100],'kudat':[6.8903,116.8487],
+  'kota marudu':[6.1862,116.8338],'papar':[5.7313,115.9272],
+  'tuaran':[6.1826,116.3652],'penampang':[5.9218,116.1003],
+  'putatan':[5.8845,116.0727],'menggatal':[6.0516,116.1475],
+  // Sarawak
+  'sarawak':[1.5535,110.3593],'kuching':[1.5535,110.3593],
+  'miri':[4.3995,113.9914],'sibu':[2.3073,111.8256],
+  'bintulu':[3.1681,113.0450],'sri aman':[1.2367,111.4634],
+  'kapit':[2.0103,112.9330],'limbang':[4.7477,115.0094],
+  'mukah':[2.9039,112.0809],'sarikei':[2.1255,111.5236],
+  'betong':[1.3942,111.5101],'samarahan':[1.4529,110.4756],
+  'kota samarahan':[1.4529,110.4756],'serian':[1.1716,110.5698],
+  'lundu':[1.6720,109.8509],'bau':[1.4028,110.1632],
+  'lawas':[4.8508,115.4108],'tatau':[2.9939,113.1167],
+};
+
+// ─── Leaflet map init ──────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([4.2, 108.5], 6);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+}).addTo(map);
+
+const cluster = L.markerClusterGroup({
+  chunkedLoading: true,
+  maxClusterRadius: 50,
+  showCoverageOnHover: false,
+  spiderfyOnMaxZoom: true,
+});
+map.addLayer(cluster);
+
+// Custom purple marker
+function makeIcon(color) {
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:24px;height:24px;border-radius:50% 50% 50% 0;
+      background:${color};border:2px solid white;
+      transform:rotate(-45deg);
+      box-shadow:0 2px 6px rgba(0,0,0,0.35);
+    "></div>`,
+    iconSize:[24,24], iconAnchor:[12,24], popupAnchor:[0,-24],
+  });
+}
+const pinIcon = makeIcon('#6366f1');
+
+// ─── State ────────────────────────────────────────────────────────────────
+let customers = [];
+let pinned = 0;
+let failed = 0;
+let geocodeQueue = [];
+let geocoding = false;
+let stopGeocode = false;
+const geocodeCache = {};   // address -> {lat,lng} or null
+const markerMap = {};      // customer id -> marker
+
+// ─── DOM refs ─────────────────────────────────────────────────────────────
+const searchBtn   = document.getElementById('searchBtn');
+const clearBtn    = document.getElementById('clearBtn');
+const searchTerm  = document.getElementById('searchTerm');
+const searchType  = document.getElementById('searchType');
+const resultList  = document.getElementById('result-list');
+const statsCard   = document.getElementById('stats-card');
+const listCard    = document.getElementById('list-card');
+const statTotal   = document.getElementById('stat-total');
+const statPinned  = document.getElementById('stat-pinned');
+const statFailed  = document.getElementById('stat-failed');
+const progressBar = document.getElementById('progress-bar');
+const progressWrap= document.getElementById('progress-bar-wrap');
+const mapStatus   = document.getElementById('map-status');
+
+function showStatus(msg) {
+  mapStatus.textContent = msg;
+  mapStatus.style.display = msg ? 'block' : 'none';
+}
+
+function updateStats() {
+  statTotal.textContent  = customers.length;
+  statPinned.textContent = pinned;
+  statFailed.textContent = failed;
+}
+
+// ─── Local fast geocode ────────────────────────────────────────────────────
+function localGeocode(address) {
+  if (!address) return null;
+  const lower = address.toLowerCase();
+
+  // Sort by length desc so "petaling jaya" matches before "jaya"
+  const keys = Object.keys(MY_LOCS).sort((a,b) => b.length - a.length);
+  for (const k of keys) {
+    if (lower.includes(k)) {
+      const [lat, lng] = MY_LOCS[k];
+      // tiny random jitter so stacked pins separate slightly
+      const j = 0.003;
+      return { lat: lat + (Math.random()-0.5)*j, lng: lng + (Math.random()-0.5)*j };
+    }
+  }
+  return null;
+}
+
+// ─── Nominatim fallback (rate-limited to 1.1 s) ───────────────────────────
+let lastNominatimCall = 0;
+
+async function nominatimGeocode(address) {
+  const now = Date.now();
+  const wait = 1100 - (now - lastNominatimCall);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  lastNominatimCall = Date.now();
+
+  const q = address.toLowerCase().includes('malaysia') ? address : address + ', Malaysia';
+  try {
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=my&q=${encodeURIComponent(q)}`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    const data = await resp.json();
+    if (data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch(e) {}
+  return null;
+}
+
+// ─── Geocode one customer ──────────────────────────────────────────────────
+async function geocodeOne(c) {
+  const addr = (c.address || '').trim();
+  if (!addr) return null;
+
+  if (geocodeCache[addr] !== undefined) return geocodeCache[addr];
+
+  let result = localGeocode(addr);
+  if (!result) result = await nominatimGeocode(addr);
+
+  geocodeCache[addr] = result;
+  return result;
+}
+
+// ─── Add marker to map ─────────────────────────────────────────────────────
+function addMarker(c, coords) {
+  const marker = L.marker([coords.lat, coords.lng], { icon: pinIcon });
+
+  const name    = c.name    || '—';
+  const phone   = c.phone   || '—';
+  const ic      = c.ic      || '—';
+  const address = c.address || '—';
+  const source  = c.source  || '';
+
+  marker.bindPopup(`
+    <div class="cust-popup">
+      <strong>${escHtml(name)}</strong>
+      ${source ? `<div class="pp-row"><span class="pp-label">Source</span><br>${escHtml(source)}</div>` : ''}
+      <div class="pp-row"><span class="pp-label">Phone</span><br>${escHtml(phone)}</div>
+      <div class="pp-row"><span class="pp-label">IC</span><br>${escHtml(ic)}</div>
+      <div class="pp-row"><span class="pp-label">Address</span><br>${escHtml(address)}</div>
+      <a class="detail-link" href="/customer/${c.id}/view" target="_blank">
+        <i class="fas fa-external-link-alt me-1"></i>Full Details
+      </a>
+    </div>`, { maxWidth: 280 });
+
+  cluster.addLayer(marker);
+  markerMap[c.id] = marker;
+  return marker;
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Build result list sidebar ────────────────────────────────────────────
+function buildList() {
+  resultList.innerHTML = '';
+  customers.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'cust-item';
+    div.id = `li-${c.id}`;
+    div.innerHTML = `
+      <div class="cust-name">${escHtml(c.name || '—')}</div>
+      <div class="cust-sub">${escHtml(c.phone || '')}${c.phone && c.address ? ' · ' : ''}${escHtml((c.address||'').substring(0,60))}</div>`;
+    div.addEventListener('click', () => {
+      const m = markerMap[c.id];
+      if (m) {
+        map.setView(m.getLatLng(), 16);
+        m.openPopup();
+      }
+    });
+    resultList.appendChild(div);
+  });
+}
+
+function markItemGeo(id, ok) {
+  const el = document.getElementById(`li-${id}`);
+  if (el) el.classList.add(ok ? 'geocoded' : 'failed');
+}
+
+// ─── Main geocode queue runner ─────────────────────────────────────────────
+async function runGeocodeQueue() {
+  if (geocoding) return;
+  geocoding = true;
+  stopGeocode = false;
+
+  const total = geocodeQueue.length;
+  let done = 0;
+
+  progressWrap.style.display = 'block';
+  searchBtn.disabled = true;
+  searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Plotting…';
+
+  for (const c of geocodeQueue) {
+    if (stopGeocode) break;
+    showStatus(`Geocoding ${done + 1} / ${total}…`);
+    progressBar.style.width = `${Math.round((done / total) * 100)}%`;
+
+    const coords = await geocodeOne(c);
+    done++;
+
+    if (coords) {
+      addMarker(c, coords);
+      pinned++;
+      markItemGeo(c.id, true);
+    } else {
+      failed++;
+      markItemGeo(c.id, false);
+    }
+    updateStats();
+  }
+
+  progressBar.style.width = '100%';
+  setTimeout(() => {
+    progressWrap.style.display = 'none';
+    progressBar.style.width = '0%';
+  }, 800);
+
+  showStatus(pinned > 0 ? `${pinned} customer${pinned>1?'s':''} plotted on map` : 'No addresses could be plotted');
+  setTimeout(() => showStatus(''), 4000);
+
+  searchBtn.disabled = false;
+  searchBtn.innerHTML = '<i class="fas fa-search me-1"></i> Search & Plot';
+  geocoding = false;
+  geocodeQueue = [];
+
+  // Fit map to markers
+  if (pinned > 0) {
+    try { map.fitBounds(cluster.getBounds(), { padding: [40, 40], maxZoom: 14 }); }
+    catch(e) {}
+  }
+}
+
+// ─── Clear map ────────────────────────────────────────────────────────────
+function clearMap() {
+  stopGeocode = true;
+  cluster.clearLayers();
+  Object.keys(markerMap).forEach(k => delete markerMap[k]);
+  customers = []; pinned = 0; failed = 0; geocodeQueue = [];
+  resultList.innerHTML = '';
+  statsCard.style.display = 'none';
+  listCard.style.display  = 'none';
+  clearBtn.style.display  = 'none';
+  showStatus('');
+  map.setView([4.2, 108.5], 6);
+}
+
+// ─── Search ───────────────────────────────────────────────────────────────
+async function doSearch() {
+  const term = searchTerm.value.trim();
+  if (!term) { alert('Please enter a search term.'); return; }
+
+  clearMap();
+
+  searchBtn.disabled = true;
+  searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Searching…';
+  showStatus('Searching…');
+
+  try {
+    const resp = await fetch('/admin/customer-map/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ search_type: searchType.value, search_term: term }),
+    });
+    const data = await resp.json();
+
+    if (!data.ok && (!data.customers || data.customers.length === 0)) {
+      showStatus(data.message || 'No results found.');
+      setTimeout(() => showStatus(''), 4000);
+      searchBtn.disabled = false;
+      searchBtn.innerHTML = '<i class="fas fa-search me-1"></i> Search & Plot';
+      return;
+    }
+
+    customers = data.customers || [];
+    geocodeQueue = customers.filter(c => c.address);
+
+    statsCard.style.display = 'block';
+    listCard.style.display  = 'block';
+    clearBtn.style.display  = 'block';
+    updateStats();
+    buildList();
+
+    if (geocodeQueue.length === 0) {
+      showStatus('Results found but no addresses to plot.');
+      setTimeout(() => showStatus(''), 4000);
+      searchBtn.disabled = false;
+      searchBtn.innerHTML = '<i class="fas fa-search me-1"></i> Search & Plot';
+      return;
+    }
+
+    runGeocodeQueue();
+
+  } catch(e) {
+    showStatus('Search failed. Please try again.');
+    searchBtn.disabled = false;
+    searchBtn.innerHTML = '<i class="fas fa-search me-1"></i> Search & Plot';
+  }
+}
+
+// ─── Event listeners ──────────────────────────────────────────────────────
+searchBtn.addEventListener('click', doSearch);
+clearBtn.addEventListener('click', clearMap);
+searchTerm.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+</script>
+{% endblock %}
