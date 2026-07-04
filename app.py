@@ -2452,15 +2452,21 @@ def analyze_login_behavior(user, login_log):
         )
 
 def clean_data_value(value):
+    if isinstance(value, (pd.Series, np.ndarray, list, tuple)):
+        # Duplicate/misaligned column selection can hand back an array-like
+        # instead of a scalar. Take the first real value rather than
+        # silently stringifying the whole thing into the DB.
+        value = next((v for v in value if not pd.isna(v)), '')
+
     if pd.isna(value):
         return ''
-    
+
     value_str = str(value).strip()
     value_str = ' '.join(value_str.split())
-    
+
     if value_str.lower() in ['null', 'none', 'nan', 'n/a', '']:
         return ''
-    
+
     return value_str
 
 
